@@ -85,6 +85,50 @@
     }
   };
 
+  const apiRequest = async (url, options = {}) => {
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      ...options,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) {
+      const error = new Error(payload.error || `Request failed (${response.status})`);
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  };
+
+  let contentPromise = null;
+  const loadContent = () => {
+    if (!contentPromise) {
+      contentPromise = apiRequest("/api/content").catch((error) => {
+        console.warn("[jp-ui] content unavailable", error);
+        return null;
+      });
+    }
+    return contentPromise;
+  };
+
+  const ensureButtons = (buttons, count) => {
+    if (!buttons.length || count <= 0) return buttons;
+    const container = buttons[0].parentElement;
+    if (!container) return buttons;
+    while (buttons.length < count) {
+      const clone = buttons[0].cloneNode(true);
+      delete clone.dataset.jpBound;
+      clone.removeAttribute("aria-current");
+      const span = clone.querySelector("span");
+      if (span) span.style.width = "0%";
+      container.appendChild(clone);
+      buttons.push(clone);
+    }
+    buttons.forEach((button, index) => {
+      button.hidden = index >= count;
+    });
+    return buttons;
+  };
+
   const moveNavigation = () => {
     const header = document.querySelector("header");
     if (!header) return;
@@ -154,7 +198,7 @@
             </label>
             <p class="jp-message" role="status" data-jp-message></p>
             <button class="jp-submit" type="submit">Create account</button>
-            <p class="jp-register-note">Your account is stored only in this browser preview.</p>
+            <p class="jp-register-note">Your account is secured by JP.</p>
           </form>
         </div>
       </div>
@@ -370,15 +414,23 @@
 
   const loadIndex = () => {
     if (!indexPromise) {
-      indexPromise = fetch("/search-index.json")
-        .then((response) => {
-          if (!response.ok) throw new Error("Search index unavailable");
-          return response.json();
-        })
+      indexPromise = apiRequest("/api/catalog")
         .then((data) => {
+          if (!Array.isArray(data.products)) throw new Error("Catalog unavailable");
           searchIndex = data;
           return data;
         })
+        .catch(() =>
+          fetch("/search-index.json")
+            .then((response) => {
+              if (!response.ok) throw new Error("Search index unavailable");
+              return response.json();
+            })
+            .then((data) => {
+              searchIndex = data;
+              return data;
+            }),
+        )
         .catch(() => {
           searchIndex = { products: [], collections: [] };
           return searchIndex;
@@ -449,41 +501,87 @@
     searchResults.innerHTML = visibleResults.map(resultHtml).join("");
   };
 
-  const submitAccountForm = (form) => {
+  const submitAccountForm = async (form) => {
     const formName = form.dataset.jpForm;
     const data = new FormData(form);
     const email = String(data.get("email") || "").trim().toLowerCase();
+    const password = String(data.get("password") || "");
     const name =
       String(data.get("name") || "").trim() ||
       email.split("@")[0] ||
       "Account";
 
     if (formName === "register") {
-      const accounts = readAccounts();
-      const existing = accounts.find((account) => account.email === email);
-      if (existing) {
-        existing.name = name;
-      } else {
-        accounts.push({ name, email });
+      setMessage("register", "Creating your account…");
+      try {
+        const result = await apiRequest("/api/accounts/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        writeSession({
+          id: result.user.id,
+          name: result.user.fullName,
+          email: result.user.email,
+          role: result.user.role,
+        });
+        updateAccountButton();
+        setMessage("register", `Account created for ${email}.`, "success");
+        window.setTimeout(() => {
+          if (!accountOverlay.hidden) closeOverlay(accountOverlay);
+        }, 1100);
+      } catch (error) {
+        if (error.status !== 503) {
+          setMessage("register", error.message || "Could not create the account.", "error");
+          return;
+        }
+        const accounts = readAccounts();
+        const existing = accounts.find((account) => account.email === email);
+        if (existing) existing.name = name;
+        else accounts.push({ name, email });
+        writeAccounts(accounts);
+        writeSession({ name, email });
+        updateAccountButton();
+        setMessage("register", `Account created for ${email}.`, "success");
+        window.setTimeout(() => {
+          if (!accountOverlay.hidden) closeOverlay(accountOverlay);
+        }, 1100);
       }
-      writeAccounts(accounts);
-      writeSession({ name, email });
-      updateAccountButton();
-      setMessage("register", `Account created for ${email}.`, "success");
-      window.setTimeout(() => {
-        if (!accountOverlay.hidden) closeOverlay(accountOverlay);
-      }, 1100);
       return;
     }
 
-    const account = readAccounts().find((entry) => entry.email === email);
-    const sessionName = account?.name || name;
-    writeSession({ name: sessionName, email });
-    updateAccountButton();
-    setMessage("signin", `Signed in locally as ${sessionName}.`, "success");
-    window.setTimeout(() => {
-      if (!accountOverlay.hidden) closeOverlay(accountOverlay);
-    }, 1100);
+    setMessage("signin", "Signing in…");
+    try {
+      const result = await apiRequest("/api/accounts/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      writeSession({
+        id: result.user.id,
+        name: result.user.fullName,
+        email: result.user.email,
+        role: result.user.role,
+      });
+      updateAccountButton();
+      setMessage("signin", `Signed in as ${result.user.fullName}.`, "success");
+      window.setTimeout(() => {
+        if (!accountOverlay.hidden) closeOverlay(accountOverlay);
+      }, 1100);
+    } catch (error) {
+      if (error.status !== 503) {
+        setMessage("signin", error.message || "Email or password is incorrect.", "error");
+        return;
+      }
+      const account = readAccounts().find((entry) => entry.email === email);
+      const sessionName = account?.name || name;
+      writeSession({ name: sessionName, email });
+      updateAccountButton();
+      setMessage("signin", `Signed in locally as ${sessionName}.`, "success");
+      window.setTimeout(() => {
+        if (!accountOverlay.hidden) closeOverlay(accountOverlay);
+      }, 1100);
+    }
   };
 
   moveNavigation();
@@ -512,6 +610,22 @@
   }
 
   updateAccountButton();
+
+  apiRequest("/api/accounts/me")
+    .then((result) => {
+      if (result.user) {
+        writeSession({
+          id: result.user.id,
+          name: result.user.fullName,
+          email: result.user.email,
+          role: result.user.role,
+        });
+      } else if (result.configured) {
+        writeSession(null);
+      }
+      updateAccountButton();
+    })
+    .catch(() => {});
 
   accountOverlay
     .querySelectorAll("[data-jp-tab]")
@@ -550,7 +664,7 @@
     ?.addEventListener("click", () => {
       setMessage(
         "signin",
-        "Password recovery is not connected in this local preview.",
+        "Password recovery is not available yet. Please contact customer care.",
         "error",
       );
     });
@@ -738,6 +852,7 @@
     if (heading) heading.textContent = "Shopping bag";
     if (main.dataset.jpCartBound) return;
     main.dataset.jpCartBound = "true";
+    let content = null;
 
     const render = (catalog = []) => {
       const cart = readCart().map((item) => {
@@ -754,6 +869,21 @@
       updateCartBadge();
       const count = cart.reduce((total, item) => total + item.quantity, 0);
       const subtotal = cart.reduce((total, item) => total + parseMoney(item.price) * item.quantity, 0);
+      const delivery = content?.delivery;
+      const freeShipping =
+        delivery?.freeShippingThreshold !== null &&
+        delivery?.freeShippingThreshold !== undefined &&
+        subtotal >= Number(delivery.freeShippingThreshold);
+      const shippingPrice = freeShipping
+        ? 0
+        : delivery
+          ? Number(delivery.standardPrice || 0)
+          : 0;
+      const shippingLabel = delivery
+        ? `${delivery.standardLabel || "Standard shipping"} (${delivery.standardDaysMin}-${delivery.standardDaysMax} business days)`
+        : "Standard shipping (3-5 business days)";
+      const taxNote = delivery?.taxNote || "Tax is calculated after payment";
+      const total = subtotal + shippingPrice;
       const countLabel = `${count} ${count === 1 ? "item" : "items"}`;
       let heroCount = hero?.querySelector("[data-jp-cart-count]");
       if (!heroCount && heading) {
@@ -793,10 +923,10 @@
           <aside class="jp-cart-summary" aria-label="Order summary">
             <h2>Order summary</h2>
             <div class="jp-cart-summary-row"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
-            <div class="jp-cart-summary-row jp-cart-shipping"><span>Shipping<small>Standard shipping (3-5 business days)</small></span><strong>$0.00</strong></div>
-            <div class="jp-cart-total"><span>Total</span><strong>${money(subtotal)}</strong></div>
+            <div class="jp-cart-summary-row jp-cart-shipping"><span>Shipping<small>${escapeHtml(shippingLabel)}</small></span><strong>${money(shippingPrice)}</strong></div>
+            <div class="jp-cart-total"><span>Total</span><strong>${money(total)}</strong></div>
             <button class="jp-cart-checkout" type="button" data-jp-cart-checkout>Proceed to checkout</button>
-            <p class="jp-cart-tax">Tax is calculated after payment</p>
+            <p class="jp-cart-tax">${escapeHtml(taxNote)}</p>
           </aside>
         </div>`;
     };
@@ -812,7 +942,52 @@
       if (target.hasAttribute("data-jp-cart-remove")) cart.splice(index, 1);
       if (target.hasAttribute("data-jp-cart-clear")) cart.length = 0;
       if (target.hasAttribute("data-jp-cart-checkout")) {
-        showToast("Checkout is not connected in this preview.");
+        const session = readSession();
+        if (!session?.email) {
+          showToast("Please sign in to place your order.");
+          openAccount();
+          return;
+        }
+        const items = cart
+          .map((item) => {
+            const match = String(item.url || "").match(/\/product\/(\d+)/);
+            return match
+              ? {
+                  productId: Number(match[1]),
+                  quantity: Math.max(1, Number(item.quantity) || 1),
+                }
+              : null;
+          })
+          .filter(Boolean);
+        if (!items.length) {
+          showToast("Your bag could not be matched to the catalog.");
+          return;
+        }
+        target.disabled = true;
+        target.textContent = "Placing order…";
+        apiRequest("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: session.email, items }),
+        })
+          .then((result) => {
+            writeCart([]);
+            showToast(
+              result.order?.orderNumber
+                ? `Order ${result.order.orderNumber} placed. Thank you.`
+                : "Order placed. Thank you.",
+            );
+            loadIndex().then((data) => render(data.products || []));
+          })
+          .catch((error) => {
+            target.disabled = false;
+            target.textContent = "Proceed to checkout";
+            showToast(
+              error.status === 503
+                ? "Checkout is not connected in this preview."
+                : error.message || "Could not place the order.",
+            );
+          });
         return;
       }
       writeCart(cart.filter((item) => Number(item.quantity || 0) > 0));
@@ -820,6 +995,11 @@
     });
 
     loadIndex().then((data) => render(data.products || [])).catch(() => render());
+    loadContent().then((loaded) => {
+      if (!loaded?.delivery) return;
+      content = loaded;
+      loadIndex().then((data) => render(data.products || [])).catch(() => render());
+    });
   };
 
   const setupCarousels = () => {
@@ -998,8 +1178,8 @@
     });
   };
 
-  const setupEditorialCarousels = () => {
-    const looks = [
+  const setupEditorialCarousels = async () => {
+    const fallbackLooks = [
       {
         brand: "Cartier",
         name: "Cartier CT0543S",
@@ -1021,7 +1201,7 @@
         aspect: "1200 / 1501",
       },
     ];
-    const reels = [
+    const fallbackReels = [
       {
         brand: "Cartier",
         name: "Cartier CT0092O",
@@ -1045,6 +1225,9 @@
         alt: "Cartier CT0344O with warm tint and faceted edges",
       },
     ];
+    const content = await loadContent();
+    const looks = content?.looks?.length ? content.looks : fallbackLooks;
+    const reels = content?.reels?.length ? content.reels : fallbackReels;
     const volumeOff =
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><line x1="22" x2="16" y1="9" y2="15"></line><line x1="16" x2="22" y1="9" y2="15"></line></svg>';
     const volumeOn =
@@ -1095,6 +1278,7 @@
       const prev = section.querySelector('button[aria-label="Previous look"]');
       const next = section.querySelector('button[aria-label="Next look"]');
       const dots = Array.from(section.querySelectorAll('button[aria-label^="Look "]'));
+      ensureButtons(dots, looks.length);
       if (
         !model ||
         !media ||
@@ -1117,7 +1301,7 @@
         const look = looks[index];
         model.src = look.image;
         model.alt = look.alt;
-        media.style.aspectRatio = look.aspect;
+        media.style.aspectRatio = look.aspect || "1200 / 1600";
         brand.textContent = look.brand;
         name.textContent = look.name;
         price.textContent = look.price;
@@ -1149,6 +1333,7 @@
       const prev = section.querySelector('button[aria-label="Previous look"]');
       const next = section.querySelector('button[aria-label="Next look"]');
       const dots = Array.from(section.querySelectorAll('button[aria-label^="Reel "]'));
+      ensureButtons(dots, reels.length);
       if (
         !video ||
         !media ||
@@ -1220,7 +1405,7 @@
     setupReels();
   };
 
-  const setupHeroControls = () => {
+  const setupHeroControls = async () => {
     const buttons = Array.from(document.querySelectorAll('button[aria-label^="Go to "]'));
     const hero = buttons[0]?.closest("section");
     const title = hero?.querySelector("h1");
@@ -1236,7 +1421,7 @@
     const localCartierDesktop = "/media/v0/b/site-bucket/o/banner_photos/home_cartier_precious_sunglasses_desktop.webp";
     const localCartierMobile = "/media/v0/b/site-bucket/o/banner_photos/home_cartier_precious_sunglasses_mobile.webp";
     const localDitaFallback = "/media/v0/b/site-bucket/o/banner_photos/brandshowcase_akoni.webp";
-    const slides = [
+    const fallbackSlides = [
       {
         name: "Cartier",
         subtitle: "Precious sunglasses",
@@ -1264,6 +1449,13 @@
         duration: 20000,
       },
     ];
+    const contentData = await loadContent();
+    const slides = contentData?.heroSlides?.length ? contentData.heroSlides : fallbackSlides;
+    ensureButtons(buttons, slides.length);
+    slides.forEach((slide) => {
+      slide.duration = Number(slide.duration) || 8000;
+      slide.mobile = slide.mobile || slide.desktop;
+    });
     const progress = buttons.map((button) => button.querySelector("span"));
     const scrim = Array.from(mediaLayer.children).find((child) => child.classList.contains("bg-gradient-to-b"));
     let currentIndex = Math.max(0, slides.findIndex((slide) => slide.name === title.textContent?.trim()));
@@ -1540,7 +1732,11 @@
     loadIndex()
       .then((data) => {
         const allProducts = Array.isArray(data.products) ? data.products : [];
-        const products = transitions ? allProducts.filter(productHasTransitions) : allProducts;
+        const products = allProducts.filter((product) => {
+          if (activeType && product.type !== activeType) return false;
+          if (transitions && !productHasTransitions(product)) return false;
+          return true;
+        });
         if (!products.length) throw new Error("Catalog is empty");
         const count = Array.from(document.querySelectorAll(".sticky p")).find((item) =>
           /products?$/i.test(item.textContent.trim()),
@@ -1625,8 +1821,13 @@
       button.dataset.jpBound = "true";
       button.type = "button";
       answer.hidden = true;
+      answer.style.maxHeight = "0px";
       button.setAttribute("aria-expanded", "false");
-      button.addEventListener("click", () => { answer.hidden = !answer.hidden; button.setAttribute("aria-expanded", String(!answer.hidden)); });
+      button.addEventListener("click", () => {
+        answer.hidden = !answer.hidden;
+        answer.style.maxHeight = answer.hidden ? "0px" : "none";
+        button.setAttribute("aria-expanded", String(!answer.hidden));
+      });
     });
   };
 
@@ -1634,20 +1835,298 @@
     document.querySelectorAll("form").forEach((form) => {
       if (form.dataset.jpForm || form.dataset.jpSearchForm || form.dataset.jpBound) return;
       form.dataset.jpBound = "true";
-      form.addEventListener("submit", (event) => {
-        if (form.querySelector("input[name=first_name], textarea[name=message]")) {
+      form.addEventListener("submit", async (event) => {
+        const contactForm = Boolean(
+          form.querySelector("input[name=first_name], textarea[name=message]"),
+        );
+        if (contactForm) {
           event.preventDefault();
-          showToast("Thanks — your message was recorded in this preview.");
-          form.reset();
+          const data = new FormData(form);
+          const email = String(data.get("email") || "").trim().toLowerCase();
+          const message = String(data.get("message") || "").trim();
+          if (!email || !message) {
+            showToast("Add your email and a message.");
+            return;
+          }
+          const submit = form.querySelector('button[type="submit"]');
+          if (submit) submit.disabled = true;
+          showToast("Sending your message…");
+          try {
+            await apiRequest("/api/inquiries", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: [data.get("first_name"), data.get("last_name")]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim(),
+                email,
+                phone: data.get("phone"),
+                subject: data.get("subject"),
+                message,
+                source: window.location.pathname.startsWith("/product/")
+                  ? "product"
+                  : "contact",
+              }),
+            });
+            showToast("Thanks — your message was sent.");
+            form.reset();
+          } catch (error) {
+            showToast(error.message || "Could not send your message.");
+          } finally {
+            if (submit) submit.disabled = false;
+          }
           return;
         }
+
         if (form.querySelector('input[type="email"]')) {
           event.preventDefault();
-          showToast("You are on the list. Welcome.");
-          form.reset();
+          const data = new FormData(form);
+          const email = String(data.get("email") || "").trim().toLowerCase();
+          if (!email) return;
+          const submit = form.querySelector('button[type="submit"]');
+          if (submit) submit.disabled = true;
+          showToast("Joining the list…");
+          try {
+            await apiRequest("/api/newsletter", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, source: "footer" }),
+            });
+            showToast("You are on the list. Welcome.");
+            form.reset();
+          } catch (error) {
+            showToast(error.message || "Could not subscribe right now.");
+          } finally {
+            if (submit) submit.disabled = false;
+          }
         }
       });
     });
+  };
+
+  const setupFaqContent = async () => {
+    if (!window.location.pathname.includes("/help/faq")) return;
+    const content = await loadContent();
+    if (!content?.faqs?.length) return;
+    const heading = Array.from(document.querySelectorAll("h1")).find((item) =>
+      /frequently asked questions/i.test(item.textContent || ""),
+    );
+    const list = heading?.nextElementSibling;
+    if (!list) return;
+    const plus =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus h-5 w-5 flex-shrink-0"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>';
+    list.innerHTML = content.faqs
+      .map(
+        (faq) => `<div class="border border-gray-200 rounded-lg overflow-hidden">
+          <button class="flex justify-between items-center w-full p-5 text-left font-medium focus:outline-none" type="button">
+            <span>${escapeHtml(faq.question)}</span>${plus}
+          </button>
+          <div class="overflow-hidden transition-all duration-300 max-h-0"><p class="text-gray-700">${escapeHtml(faq.answer)}</p></div>
+        </div>`,
+      )
+      .join("");
+    setupFaq();
+  };
+
+  const setupHomepageReviews = async () => {
+    if (window.location.pathname !== "/") return;
+    const content = await loadContent();
+    if (!content?.reviews?.length) return;
+    const section = Array.from(document.querySelectorAll("section")).find(
+      (item) =>
+        item.querySelector("h2")?.textContent.trim().toLowerCase() ===
+        "what our clients say",
+    );
+    const firstCard = section?.querySelector('article[data-card="true"]');
+    const container = firstCard?.parentElement;
+    if (!container) return;
+    const star =
+      '<svg viewBox="0 0 20 20" class="h-[13px] w-[13px] fill-black" aria-hidden="true"><path d="M10 1.6l2.47 5.2 5.53.74-4.05 3.94.99 5.62L10 14.42 5.06 17.1l.99-5.62L2 7.54l5.53-.74L10 1.6z"></path></svg>';
+    container.innerHTML = content.reviews
+      .slice(0, 12)
+      .map((review) => {
+        const rating = Math.max(1, Math.min(5, Number(review.rating) || 5));
+        return `<article data-card="true" class="flex w-[280px] shrink-0 flex-col border border-neutral-200 p-6 sm:w-[340px] lg:w-[380px]">
+          <span class="inline-flex gap-[3px]" aria-label="${rating} out of 5 stars">${star.repeat(rating)}</span>
+          <p class="mt-5 text-[13px] leading-relaxed text-neutral-700">${escapeHtml(review.body)}</p>
+          <footer class="mt-6 border-t border-neutral-100 pt-4">
+            <p class="text-[12px] uppercase tracking-[0.14em] text-black">${escapeHtml(review.authorName || "JP client")}</p>
+            <p class="mt-1 text-[11px] uppercase tracking-[0.12em] text-neutral-400">${escapeHtml(review.relativeDate || "Recently")}</p>
+          </footer>
+        </article>`;
+      })
+      .join("");
+  };
+
+  const setupProductMedia = () => {
+    const match = window.location.pathname.match(/^\/product\/(\d+)\/?$/);
+    if (!match) return;
+    const productId = Number(match[1]);
+    loadIndex()
+      .then((data) => {
+        const product = (data.products || []).find(
+          (item) => Number(item.id) === productId || item.url === window.location.pathname,
+        );
+        const images = Array.isArray(product?.images) ? [...product.images] : [];
+        const urls = images
+          .sort((a, b) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
+          .map((image) => image.url)
+          .filter(Boolean);
+        if (!urls.length) return;
+        const alt =
+          product?.name || document.querySelector("main h1")?.textContent.trim() || "";
+        const thumbs = Array.from(document.querySelectorAll('button[aria-label^="Photo "]'));
+        const mains = Array.from(document.querySelectorAll("img.p-10"));
+        const mobiles = Array.from(document.querySelectorAll("img.p-6"));
+
+        const thumbHost = thumbs[0]?.parentElement;
+        if (thumbHost) {
+          while (thumbs.length < urls.length) {
+            const clone = thumbs[thumbs.length - 1].cloneNode(true);
+            delete clone.dataset.jpBound;
+            thumbHost.appendChild(clone);
+            thumbs.push(clone);
+          }
+          thumbs.forEach((button, index) => {
+            if (index >= urls.length) {
+              button.remove();
+              return;
+            }
+            const image = button.querySelector("img");
+            if (image) image.src = urls[index];
+            button.setAttribute("aria-label", `Photo ${index + 1}`);
+            button.classList.toggle("ring-1", index === 0);
+            button.classList.toggle("ring-black", index === 0);
+            button.classList.toggle("opacity-70", index !== 0);
+          });
+        }
+
+        const mainHost = mains[0]?.closest(".aspect-square")?.parentElement;
+        if (mainHost) {
+          while (mains.length < urls.length && mains.length) {
+            const container = mains[mains.length - 1].closest(".aspect-square");
+            if (!container) break;
+            const clone = container.cloneNode(true);
+            mainHost.appendChild(clone);
+            mains.push(clone.querySelector("img"));
+          }
+          mains.forEach((image, index) => {
+            if (index >= urls.length) {
+              image.closest(".aspect-square")?.remove();
+              return;
+            }
+            image.src = urls[index];
+            image.alt = alt;
+            image.removeAttribute("srcset");
+          });
+        }
+
+        const mobileHost = mobiles[0]?.closest(".w-full.shrink-0.snap-center")?.parentElement;
+        if (mobileHost) {
+          while (mobiles.length < urls.length && mobiles.length) {
+            const container = mobiles[mobiles.length - 1].closest(
+              ".w-full.shrink-0.snap-center",
+            );
+            if (!container) break;
+            const clone = container.cloneNode(true);
+            mobileHost.appendChild(clone);
+            mobiles.push(clone.querySelector("img"));
+          }
+          mobiles.forEach((image, index) => {
+            if (index >= urls.length) {
+              image.closest(".w-full.shrink-0.snap-center")?.remove();
+              return;
+            }
+            image.src = urls[index];
+            image.alt = alt;
+          });
+        }
+
+        setupProductGallery();
+      })
+      .catch(() => {});
+  };
+
+  const setupProfilePage = () => {
+    if (window.location.pathname !== "/profile") return;
+    const main = document.querySelector("main");
+    if (!main || main.dataset.jpProfileBound) return;
+    main.dataset.jpProfileBound = "true";
+
+    const signOut = Array.from(main.querySelectorAll("button")).find((button) =>
+      /sign out/i.test(button.textContent || ""),
+    );
+    signOut?.addEventListener("click", async () => {
+      try {
+        await apiRequest("/api/accounts/logout", { method: "POST" });
+      } catch {
+        // Local fallback still clears the browser session.
+      }
+      writeSession(null);
+      window.location.reload();
+    });
+
+    const section = Array.from(main.querySelectorAll("section")).find(
+      (item) => item.querySelector("h2")?.textContent.trim().toLowerCase() === "orders",
+    );
+    const empty = section?.querySelector(":scope > div.flex.flex-col");
+    if (!section || !empty) return;
+
+    const session = readSession();
+    if (!session?.email) {
+      empty.innerHTML = `<span class="flex h-12 w-12 items-center justify-center rounded-full border border-neutral-300 text-neutral-400">${ICONS.search}</span>
+        <p class="mt-6 text-[12px] uppercase tracking-[0.16em] text-black">Sign in to view orders</p>
+        <p class="mt-3 max-w-[320px] text-[12px] leading-relaxed text-neutral-500">Your order history appears here after you sign in.</p>
+        <div class="mt-7"><button class="inline-flex items-center justify-center gap-2 bg-black px-9 py-3.5 text-[12px] uppercase tracking-[0.16em] text-white transition-opacity duration-300 hover:opacity-85" type="button" data-jp-profile-signin>Sign in</button></div>`;
+      empty
+        .querySelector("[data-jp-profile-signin]")
+        ?.addEventListener("click", openAccount);
+      return;
+    }
+
+    apiRequest("/api/orders")
+      .then((result) => {
+        const orders = Array.isArray(result.orders) ? result.orders : [];
+        if (!orders.length) return;
+        empty.outerHTML = `<div class="divide-y divide-neutral-200">${orders
+          .map((order) => {
+            const items = Array.isArray(order.order_items) ? order.order_items : [];
+            const count = items.reduce(
+              (total, item) => total + Number(item.quantity || 0),
+              0,
+            );
+            const placed = order.placed_at
+              ? new Date(order.placed_at).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })
+              : "";
+            return `<article class="px-6 py-5 lg:px-8">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="text-[12px] uppercase tracking-[0.14em] text-black">Order ${escapeHtml(order.order_number || "")}</p>
+                  <p class="mt-1 text-[12px] text-neutral-500">${escapeHtml(placed)} &middot; ${count} ${count === 1 ? "item" : "items"}</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-[12px] uppercase tracking-[0.14em] text-black">${escapeHtml(String(order.status || "").replace(/_/g, " "))}</p>
+                  <p class="mt-1 text-[12px] text-neutral-500">${money(Number(order.total || 0))}</p>
+                </div>
+              </div>
+              <div class="mt-4 flex flex-wrap gap-4">${items
+                .map(
+                  (item) => `<a class="flex items-center gap-3 text-[12px] text-neutral-500 transition-colors duration-300 hover:text-black" href="/product/${Number(item.product_id) || ""}">
+                    <img src="${escapeHtml(item.image_url || "/mirror-assets/placeholder.svg")}" alt="" class="h-12 w-12 border border-neutral-200 object-contain p-1">
+                    <span>${escapeHtml(item.name || "Product")} &times; ${Number(item.quantity) || 1}</span>
+                  </a>`,
+                )
+                .join("")}</div>
+            </article>`;
+          })
+          .join("")}</div>`;
+      })
+      .catch(() => {});
   };
 
   const setupCallButton = () => {
@@ -1657,6 +2136,89 @@
     button.type = "button";
     button.setAttribute("aria-label", "Call JP");
     button.addEventListener("click", () => { window.location.href = "tel:+13475445139"; });
+  };
+
+  const setupLiveUpdates = () => {
+    if (!("EventSource" in window)) return;
+    const catalogTopics = new Set([
+      "products",
+      "product_images",
+      "product_variants",
+      "categories",
+      "subcategories",
+      "collections",
+    ]);
+    const contentTopics = new Set([
+      "hero_slides",
+      "editorial_looks",
+      "announcements",
+      "delivery_settings",
+      "faqs",
+      "reviews",
+    ]);
+    let timer = null;
+    let reloadTimer = null;
+    let pending = new Set();
+
+    const reload = () => {
+      if (reloadTimer) return;
+      reloadTimer = window.setTimeout(() => window.location.reload(), 1200);
+    };
+
+    const refresh = () => {
+      const topics = pending;
+      pending = new Set();
+      if (!topics.size) return;
+
+      if ([...topics].some((topic) => catalogTopics.has(topic))) {
+        indexPromise = null;
+        searchIndex = null;
+        const path = window.location.pathname;
+        if (path === "/shop") {
+          const grid = document.querySelector("main > .grid");
+          if (grid) delete grid.dataset.jpCatalogBound;
+          setupShopCatalog();
+        } else if (/^\/product\/\d+\/?$/.test(path)) {
+          setupProductMedia();
+        }
+      }
+
+      if ([...topics].some((topic) => contentTopics.has(topic))) {
+        contentPromise = null;
+        setupFaqContent();
+        setupHomepageReviews();
+        const path = window.location.pathname;
+        const needsReload =
+          (path === "/" &&
+            [...topics].some((topic) =>
+              ["hero_slides", "editorial_looks", "announcements"].includes(topic),
+            )) ||
+          (path === "/cart" && topics.has("delivery_settings"));
+        if (needsReload) reload();
+      }
+
+      if (topics.has("orders") && /\/(profile|account)/.test(window.location.pathname)) {
+        reload();
+      }
+    };
+
+    try {
+      const source = new EventSource("/api/realtime");
+      source.addEventListener("change", (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (!payload?.topic) return;
+          pending.add(payload.topic);
+          if (timer) window.clearTimeout(timer);
+          timer = window.setTimeout(refresh, 450);
+        } catch {
+          // Ignore malformed events.
+        }
+      });
+      window.addEventListener("pagehide", () => source.close(), { once: true });
+    } catch {
+      // Live updates are optional.
+    }
   };
 
   setupProductActions();
@@ -1674,7 +2236,11 @@
   setupComboboxes();
   setupFaq();
   setupForms();
+  setupFaqContent();
+  setupHomepageReviews();
+  setupProfilePage();
   setupCallButton();
+  setupLiveUpdates();
 
   document.documentElement.classList.add("jp-ui-ready");
 })();

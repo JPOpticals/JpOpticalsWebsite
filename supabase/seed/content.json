@@ -1,0 +1,102 @@
+{
+  "heroSlides": [
+    {
+      "name": "Cartier",
+      "subtitle": "Precious sunglasses",
+      "ctaLabel": "Shop Cartier",
+      "ctaHref": "/collection/14",
+      "desktopImageUrl": "/media/v0/b/site-bucket/o/banner_photos/home_cartier_precious_sunglasses_desktop.webp",
+      "mobileImageUrl": "/media/v0/b/site-bucket/o/banner_photos/home_cartier_precious_sunglasses_mobile.webp",
+      "videoUrl": null,
+      "durationMs": 8000
+    },
+    {
+      "name": "Dita",
+      "subtitle": "Explore best-sellers",
+      "ctaLabel": "Shop Dita",
+      "ctaHref": "/collection/4",
+      "desktopImageUrl": "/media/v0/b/site-bucket/o/banner_photos/brandshowcase_akoni.webp",
+      "mobileImageUrl": "/media/v0/b/site-bucket/o/banner_photos/brandshowcase_akoni.webp",
+      "videoUrl": null,
+      "durationMs": 8000
+    },
+    {
+      "name": "Maybach",
+      "subtitle": "Crafted without compromise",
+      "ctaLabel": "Shop Maybach",
+      "ctaHref": "/collection/10",
+      "desktopImageUrl": null,
+      "mobileImageUrl": null,
+      "videoUrl": "/mirror-assets/5f6caed4c6b06e08.mp4",
+      "durationMs": 20000
+    }
+  ],
+  "looks": [
+    {
+      "brand": "Cartier",
+      "name": "Cartier CT0543S",
+      "price": 2245,
+      "imageUrl": "/media/v0/b/site-bucket/o/banner_photos/home_cartier_ct0543s_003_w1200.webp",
+      "productImageUrl": "/mirror-assets/e6d9444482466b57.png",
+      "href": "/product/4454?variant_id=20452",
+      "alt": "Cartier CT0543S",
+      "aspectRatio": "1200 / 1600"
+    },
+    {
+      "brand": "Dita",
+      "name": "Dita Hyperlux-3000",
+      "price": 1205,
+      "imageUrl": "/mirror-assets/140a5b0f54b49566.webp",
+      "productImageUrl": "/mirror-assets/15ab2d66f0c638c1.jpg",
+      "href": "/product/6009?variant_id=24432",
+      "alt": "Dita Hyperlux-3000",
+      "aspectRatio": "1200 / 1501"
+    }
+  ],
+  "reels": [
+    {
+      "brand": "Cartier",
+      "name": "Cartier CT0092O",
+      "price": 1345,
+      "videoUrl": "/mirror-assets/419a3f9ee6acc6c3.mp4",
+      "coverUrl": "/mirror-assets/8dd76334e801449c.webp",
+      "productImageUrl": "/mirror-assets/8cdb21822a262de3.png",
+      "href": "/product/171?variant_id=6035",
+      "instagramUrl": "https://www.instagram.com/reel/De-n6B6RAGo/",
+      "alt": "Cartier CT0092O in gold with custom tan lenses"
+    },
+    {
+      "brand": "Cartier",
+      "name": "Cartier CT0344O",
+      "price": 1345,
+      "videoUrl": "/mirror-assets/d806be0e530cddc1.mp4",
+      "coverUrl": "/mirror-assets/b06d709ea1e0c591.webp",
+      "productImageUrl": "/mirror-assets/76c6d021109e9fc3.png",
+      "href": "/product/195?variant_id=4236",
+      "instagramUrl": "https://www.instagram.com/reel/DfCbXWvRp59/",
+      "alt": "Cartier CT0344O with warm tint and faceted edges"
+    }
+  ],
+  "announcements": [
+    {
+      "message": "Complimentary shipping on select orders.",
+      "linkLabel": "Shipping & returns",
+      "linkHref": "/shipping-policy",
+      "placement": "homepage"
+    }
+  ],
+  "deliverySettings": {
+    "standardLabel": "Standard shipping",
+    "standardDaysMin": 3,
+    "standardDaysMax": 5,
+    "standardPrice": 0,
+    "expressLabel": "Express shipping",
+    "expressDaysMin": 1,
+    "expressDaysMax": 1,
+    "expressPrice": 0,
+    "freeShippingThreshold": null,
+    "shipsTo": ["US"],
+    "taxNote": "Tax is calculated after payment",
+    "returnsNote": "Some items may be eligible for return or exchange. Custom lenses, prescription lenses, electronics, and gift cards are non-returnable and non-refundable."
+  }
+}

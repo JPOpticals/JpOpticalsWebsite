@@ -5,8 +5,10 @@ Static-site mirror of `artsofoptics.com`, rebranded to **JP**, wrapped in Next.j
 ## Commands
 
 - `npm run dev` / `npm run build` / `npm start`
-- `npx tsc --noEmit` — only typecheck; there is no lint, test, or format setup.
-- `npm run enhance` — rebuild `public/search-index.json` then re-inject UI tags. Run after editing mirrored HTML or `jp-ui.*`.
+- `npx tsc --noEmit` — typecheck; there is no lint, test, or format setup.
+- `node --check public/jp-ui.js` — syntax check the client bundle.
+- `npm run supabase:seed` — regenerate `supabase/seed/seed.sql` + `catalog.json` from mirror data; does not touch the database.
+- `npm run enhance` — rebuild `public/search-index.json`, then re-inject UI tags into `public/index.html` + `public/mirror/*.html`. Run after editing mirrored HTML or `jp-ui.*`.
 - `npm run mirror` — full re-crawl, then rebrand, search index, and UI injection. Requires network and Google Chrome at the hardcoded path `C:\Program Files\Google\Chrome\Application\chrome.exe` (uses `puppeteer-core`). Slow and rewrites most tracked files.
 
 ## How the site is wired
@@ -14,25 +16,42 @@ Static-site mirror of `artsofoptics.com`, rebranded to **JP**, wrapped in Next.j
 - **Not a normal Next app.** Pages are pre-rendered HTML in `public/`, served through rewrites in `next.config.mjs`:
   - `/` → `/index.html`
   - each entry in `mirror-manifest.json` → `/mirror/<file>.html` (query strings matched via `match`)
-  - `app/[...slug]/page.tsx` is only a placeholder for routes not in the manifest; `app/page.tsx` returns `null`.
-- Homepage lives in `public/index.html`. Root `index.html` is a secondary homepage copy (also processed by rebrand). `index.original.html` is gitignored raw capture.
+  - `app/[...slug]/page.tsx` is a styled placeholder for routes not in the manifest; `app/page.tsx` returns `null`.
+- Homepage lives in `public/index.html` (served). Root `index.html` is a secondary copy processed only by `rebrand` — not served, and not touched by `enhance`.
+- Mirrored pages have all `<script>` tags stripped by the pipeline. All client behavior (search, cart/account, carousels, filters, nav) comes from `public/jp-ui.js`; don't add scripts to mirrored HTML.
+- `public/jp-ui.js` fetches `/api/catalog` (falling back to `/search-index.json`) and `/api/content` (falling back to seed JSON). Cart stays in `localStorage` (`jp_local_cart_v1`); account/session state comes from Supabase auth cookies, with `jp_local_session_v1` used only when Supabase is unavailable.
+- Server routes live in `app/api/**`; shared server helpers in `lib/` (`env.ts`, `http.ts`, `catalog.ts`, `content.ts`, `accounts.ts`, `imagekit.ts`, `supabase/*`). `app/admin/page.tsx` + `AdminClient.tsx` is the ImageKit media manager at `/admin`.
+- Secrets are server-only: `SUPABASE_Secret_key` and `IMAGEKIT_PRIVATE_KEY` must never reach the browser. Env names are documented in `supabase/README.md`.
 - Content dirs:
   - `public/mirror/` — 252 mined pages (products, collections, policies)
   - `public/mirror-assets/` — hashed downloaded images
   - `public/media/` — Firebase bucket assets after path rewriting
   - `public/site-assets/` — mirrored `_next` assets
-  - `public/jp-ui.css` + `public/jp-ui.js` — the real customization layer (search, cart/account localStorage, carousels, filters). `jp-ui.js` fetches `/search-index.json` and `/mirror/shop-type-frame-optical.html`.
 - Metadata lives in `app/layout.tsx`.
 
 ## Pipeline (order matters)
 
-`scripts/mirror.mjs` (crawl/live fetch) → `scripts/rebrand.mjs` (localize assets, strip external scripts/CDNs, replace brand/domain/email) → `scripts/build-search-index.mjs` (parse manifest pages → `public/search-index.json`) → `scripts/enhance-ui.mjs` (inject `/jp-ui.css` + `/jp-ui.js` into every `public/index.html` and `public/mirror/*.html`; has a hardcoded about-us hero transform).
+`scripts/mirror.mjs` (crawl/live fetch) → `scripts/rebrand.mjs` (localize assets, strip external scripts/CDNs, replace brand/domain/email) → `scripts/build-search-index.mjs` (parse manifest pages → `public/search-index.json`) → `scripts/enhance-ui.mjs` (inject `/jp-ui.css` + `/jp-ui.js`, normalize `media/`/`site-assets/` paths, add social links; has a hardcoded about-us hero transform).
 
 - Run scripts from the repo root; they rely on `process.cwd()` and relative paths.
 - Do **not** hand-edit `public/mirror/*.html` for lasting changes: `mirror`/`rebrand` overwrite them. Prefer `jp-ui.css`/`jp-ui.js`, or adjust the scripts.
+- `npm run enhance` is safe for manual pages; `npm run mirror` regenerates `mirror-manifest.json` and `public/mirror/`, so hand-added routes/edits are lost.
+- `build-search-index.mjs` silently drops entries if markup changes: it keys off manifest pathname prefixes `/product/` and `/collection/`, plus `og:title`, `og:image`, the price span class `text-[19px] text-black`, and brand links matching `href="/collection/\d+"`.
+- `enhance` always rewrites `search-index.json` (new `generatedAt`), so expect a diff even with unchanged content.
 - Changes to mirrored HTML are tracked in git; regeneration yields very large diffs. Commit generated files deliberately.
 - Root capture dirs (`artsofoptics-com/`, `firebasestorage-googleapis-com/`, `www-*`, etc.) and `.mirror-cache/` are intermediate and gitignored; don't edit them.
+- `next-env.d.ts` is generated by Next — don't hand-edit. Avoid adding more `.temp-*.png` screenshots to git (several are already accidentally tracked).
+
+## Database + media
+
+- `supabase/migrations/` is ordered: schema → functions/`place_order` → RLS/grants. Apply all three, then run `supabase/seed/seed.sql`.
+- Seed artifacts are generated; edit `scripts/generate-supabase-seed.mjs` or `supabase/seed/content.json`, then run `npm run supabase:seed`. Do not hand-edit `seed.sql`/`catalog.json`.
+- `supabase/tests/00_local_stubs.sql` creates local roles/`auth` stubs for testing outside Supabase; `01_smoke.sql` validates seed + order flow + RLS and rolls back.
+- Catalog/content endpoints fall back to static files when Supabase is missing or unreachable; admin/media endpoints return `503`/`403` instead of silently writing.
+- Accounts use Supabase Auth (`auth.users` + `public.customers` trigger) with HttpOnly `jp_access_token`/`jp_refresh_token` cookies. Promote admins with `update public.customers set role = 'admin' where email = '...';`.
+- ImageKit uploads/deletes happen only server-side (`lib/imagekit.ts`); `product_images` stores file IDs, URLs, dimensions, size, MIME, alt, sort order, and primary flag. Uploads max 10 MB, images only.
+- `/api/admin/media` supports multi-upload, single-image replacement (same row + old file deleted), primary selection, and delete. It invalidates the in-process catalog cache.
 
 ## Adding a route
 
-Add/keep the HTML under `public/mirror/`, add an entry to `mirror-manifest.json`, then run `npm run enhance`. Without a manifest entry the catch-all placeholder is shown.
+Add/keep the HTML under `public/mirror/`, add an entry to `mirror-manifest.json`, then run `npm run enhance`. Without a manifest entry the catch-all placeholder is shown. Re-running `npm run mirror` will discard the manual entry.
