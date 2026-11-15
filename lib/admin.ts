@@ -3,6 +3,7 @@ import { isValidEmail, normalizeEmail } from "./accounts";
 import { type AdminField, type AdminResource } from "./admin-config";
 import { invalidateCatalogCache } from "./catalog";
 import { invalidateContentCache } from "./content";
+import { invalidateCustomizerCache } from "./customizer";
 import { isSupabaseConfigured } from "./env";
 import { HttpError } from "./http";
 import { deleteFromImageKit } from "./imagekit";
@@ -88,6 +89,7 @@ export function sanitizeRecord(
 
   for (const field of resource.fields) {
     if (field.name === "password") continue;
+    if (mode === "create" && field.name === resource.idColumn && field.hideInForm) continue;
     if (mode === "update" && (field.readOnly || field.name === resource.idColumn)) continue;
     if (field.hideInForm && field.type !== "image" && field.fileIdField) continue;
 
@@ -117,6 +119,7 @@ export function sanitizeRecord(
 export function invalidateAdminCaches() {
   invalidateCatalogCache();
   invalidateContentCache();
+  invalidateCustomizerCache();
 }
 
 export function resourceSelect(resource: AdminResource) {

@@ -795,6 +795,311 @@
     });
   };
 
+  const customizerMoney = (value, currency = "USD") => {
+    const amount = Number(value || 0);
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number.isFinite(amount) ? amount : 0);
+    } catch {
+      return `$${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"}`;
+    }
+  };
+
+  const customizerColor = (value, fallback = "#d6d1ca") => {
+    const color = String(value || "").trim();
+    return /^#[0-9a-f]{3,8}$/i.test(color) || /^[a-z]+$/i.test(color) ? color : fallback;
+  };
+
+  const customizerStyle = (value) => {
+    const normalized = normalize(value);
+    if (normalized.includes("round") || normalized.includes("cat eye")) return "round";
+    if (normalized.includes("aviator")) return "aviator";
+    return "square";
+  };
+
+  const customizerAssetUrl = (value) => {
+    const url = String(value || "").trim();
+    return /^(?:https?:\/\/|\/)(?!\/)/i.test(url) ? url : "";
+  };
+
+  const customizerNumber = (value, fallback, minimum, maximum) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(maximum, Math.max(minimum, number));
+  };
+
+  const customizerPreviewGeometry = (frame) => {
+    const metadata = frame?.metadata && typeof frame.metadata === "object" ? frame.metadata : null;
+    const preview = metadata?.preview && typeof metadata.preview === "object" ? metadata.preview : null;
+    const geometry = preview?.lensGeometry || metadata?.lensGeometry;
+    if (!geometry || typeof geometry !== "object") return null;
+
+    const pane = (value, fallback) => {
+      const source = value && typeof value === "object" ? value : {};
+      return {
+        x: customizerNumber(source.x, fallback.x, 0, 100),
+        y: customizerNumber(source.y, fallback.y, 0, 100),
+        width: customizerNumber(source.width, fallback.width, 1, 100),
+        height: customizerNumber(source.height, fallback.height, 1, 100),
+        rotate: customizerNumber(source.rotate, fallback.rotate, -45, 45),
+      };
+    };
+
+    return {
+      left: pane(geometry.left, { x: 17, y: 39, width: 31, height: 25, rotate: 0 }),
+      right: pane(geometry.right, { x: 52, y: 39, width: 31, height: 25, rotate: 0 }),
+    };
+  };
+
+  const customizerUuid = (value) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+
+  const customizerPreview = (frame, lens, compact = false) => {
+    const frameImageUrl = customizerAssetUrl(frame?.imageUrl) || "/mirror-assets/placeholder.svg";
+    const frameImage = escapeHtml(frameImageUrl);
+    const frameName = escapeHtml(frame?.name || "JP frame");
+    const lensColor = customizerColor(lens?.colorCode);
+    const opacity = Math.min(0.82, Math.max(0.12, Number(lens?.tintOpacity) || 0.2));
+    const maskUrl = customizerAssetUrl(frame?.lensMaskUrl);
+    const geometry = customizerPreviewGeometry(frame);
+    const previewLayer = maskUrl
+      ? `<div class="jp-customizer__lens-mask" data-jp-lens-mask-url="${escapeHtml(maskUrl)}" aria-hidden="true"></div>`
+      : geometry
+        ? `<div class="jp-customizer__lens-layer jp-customizer__lens-layer--${customizerStyle(frame?.style)}" aria-hidden="true">
+            <span style="--pane-x:${geometry.left.x}%;--pane-y:${geometry.left.y}%;--pane-width:${geometry.left.width}%;--pane-height:${geometry.left.height}%;--pane-rotate:${geometry.left.rotate}deg"></span>
+            <span style="--pane-x:${geometry.right.x}%;--pane-y:${geometry.right.y}%;--pane-width:${geometry.right.width}%;--pane-height:${geometry.right.height}%;--pane-rotate:${geometry.right.rotate}deg"></span>
+          </div>`
+        : `<div class="jp-customizer__image-tint" data-jp-frame-image-url="${escapeHtml(frameImageUrl)}" aria-hidden="true"></div>`;
+    return `<div class="jp-customizer__stage${compact ? " is-compact" : ""}" style="--lens-color:${lensColor};--lens-opacity:${opacity}">
+      <div class="jp-customizer__artboard">${previewLayer}<img src="${frameImage}" alt="${frameName} with ${escapeHtml(lens?.name || "selected lens")}" loading="${compact ? "lazy" : "eager"}"></div>
+    </div>`;
+  };
+
+  const applyCustomizerPreviewMasks = (root) => {
+    root.querySelectorAll("[data-jp-lens-mask-url], [data-jp-frame-image-url]").forEach((element) => {
+      const url = customizerAssetUrl(element.dataset.jpLensMaskUrl || element.dataset.jpFrameImageUrl);
+      if (!url) return;
+      const safeUrl = url.replace(/["\\\r\n]/g, "");
+      const mask = `url("${safeUrl}")`;
+      element.style.maskImage = mask;
+      element.style.webkitMaskImage = mask;
+    });
+  };
+
+  const customizerCartPreview = (item) => {
+    const customization = item?.customizer;
+    if (!customization || typeof customization !== "object") {
+      return `<img src="${escapeHtml(item?.image || "/mirror-assets/placeholder.svg")}" alt="${escapeHtml(item?.name || "Product")}">`;
+    }
+    const legacyLensColors = {
+      amber: "#c28b55",
+      graphite: "#53616b",
+      ice: "#9ed5e7",
+      "ice blue": "#9ed5e7",
+      olive: "#65715d",
+      smoke: "#6e777b",
+    };
+    const legacyLensColor = normalize(customization.lensColor);
+    const frame = {
+      name: customization.frameName || item.name || "Selected frame",
+      imageUrl: customization.frameImageUrl || item.image || null,
+      lensMaskUrl: customization.frameLensMaskUrl || null,
+      style: customization.frameStyle || "Classic",
+      metadata: customization.frameMetadata || null,
+    };
+    const lens = {
+      name: customization.lensName || "Selected lens",
+      color: customization.lensColor || "Clear",
+      colorCode: customization.lensColorCode || legacyLensColors[legacyLensColor] || "#e8eef1",
+      tintOpacity: customization.lensOpacity || (legacyLensColor === "amber" ? 0.52 : 0.2),
+      style: customization.lensStyle || "Classic",
+    };
+    return customizerPreview(frame, lens, true);
+  };
+
+  const setupProductCustomizer = () => {
+    const match = window.location.pathname.match(/^\/product\/(\d+)\/?$/);
+    if (!match || document.querySelector(".jp-customizer")) return;
+    const productId = Number(match[1]);
+    const title = document.querySelector("main h1");
+    const info = title?.closest('div[class*="lg:col-start-2"]');
+    const main = document.querySelector("main");
+    const host = info || main;
+    if (!host) return;
+    const productGrid = info?.parentElement;
+
+    const customizer = document.createElement("section");
+    customizer.className = "jp-customizer";
+    if (productGrid) customizer.classList.add("jp-customizer--full");
+    customizer.setAttribute("aria-labelledby", "jp-customizer-title");
+    customizer.innerHTML = '<div class="jp-customizer__loading">Loading frame and lens options…</div>';
+    if (productGrid) productGrid.appendChild(customizer);
+    else if (host) host.appendChild(customizer);
+
+    const state = {
+      frameId: "",
+      lensId: "",
+      frameType: "All",
+      frameStyle: "All",
+      showAllFrames: false,
+      comparisons: [],
+    };
+    let customizerData = null;
+
+    const render = (data) => {
+      const frames = Array.isArray(data.frames) ? data.frames : [];
+      const allLenses = Array.isArray(data.lenses) ? data.lenses : [];
+      if (!frames.length || !allLenses.length) {
+        customizer.innerHTML = '<p class="jp-customizer__error">Customization options are not available right now. Please try again shortly.</p>';
+        return;
+      }
+
+      if (!state.frameId || !frames.some((frame) => String(frame.id) === state.frameId)) {
+        state.frameId = String(frames.find((frame) => Number(frame.productId) === productId)?.id || frames[0].id);
+      }
+      const frame = frames.find((item) => String(item.id) === state.frameId) || frames[0];
+      const compatibleIds = Array.isArray(data.compatibility?.[frame.id]) ? data.compatibility[frame.id] : [];
+      const lenses = compatibleIds.length
+        ? allLenses.filter((lens) => compatibleIds.includes(String(lens.id)))
+        : allLenses;
+      if (!lenses.length) {
+        customizer.innerHTML = '<p class="jp-customizer__error">This frame has no compatible lenses yet.</p>';
+        return;
+      }
+      if (!state.lensId || !lenses.some((lens) => String(lens.id) === state.lensId)) state.lensId = String(lenses[0].id);
+      const lens = lenses.find((item) => String(item.id) === state.lensId) || lenses[0];
+      const frameTypes = ["All", ...new Set(frames.map((item) => String(item.frameType || "Eyewear")))];
+      const frameStyles = ["All", ...new Set(frames.map((item) => String(item.style || "Classic")))];
+      if (!frameTypes.includes(state.frameType)) state.frameType = "All";
+      if (!frameStyles.includes(state.frameStyle)) state.frameStyle = "All";
+      const visibleFrames = frames
+        .filter((item) => state.frameType === "All" || String(item.frameType) === state.frameType)
+        .filter((item) => state.frameStyle === "All" || String(item.style) === state.frameStyle);
+      const cards = (state.showAllFrames ? visibleFrames : visibleFrames.slice(0, 8))
+        .map((item) => {
+          const selected = String(item.id) === String(frame.id);
+          const color = customizerColor(item.colorCode);
+          return `<button type="button" class="jp-customizer__option${selected ? " is-selected" : ""}" data-jp-customizer-frame="${escapeHtml(item.id)}" aria-pressed="${selected}">
+            <span class="jp-customizer__option-image"><img src="${escapeHtml(item.imageUrl || "/mirror-assets/placeholder.svg")}" alt="" loading="lazy"></span>
+            <span class="jp-customizer__option-name">${escapeHtml(item.name)}</span>
+            <span class="jp-customizer__option-meta">${escapeHtml(item.style || "Classic")} · ${escapeHtml(item.frameType || "Eyewear")}</span>
+            <span class="jp-customizer__swatch" style="--swatch:${color}" aria-label="${escapeHtml(item.color || "Frame color")}"></span>
+          </button>`;
+        })
+        .join("");
+      const lensCards = lenses
+        .map((item) => {
+          const selected = String(item.id) === String(lens.id);
+          const color = customizerColor(item.colorCode);
+          return `<button type="button" class="jp-customizer__lens-option${selected ? " is-selected" : ""}" data-jp-customizer-lens="${escapeHtml(item.id)}" aria-pressed="${selected}">
+            <span class="jp-customizer__lens-swatch" style="--swatch:${color};--lens-opacity:${Math.min(0.82, Math.max(0.12, Number(item.tintOpacity) || 0.2))}" aria-hidden="true"></span>
+            <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.lensType)} · ${escapeHtml(item.style)}</small></span>
+            <span class="jp-customizer__lens-price">${item.price ? `+${escapeHtml(customizerMoney(item.price, item.currency))}` : "Included"}</span>
+          </button>`;
+        })
+        .join("");
+      const total = Number(frame.price || 0) + Number(lens.price || 0);
+      const comparisonMarkup = state.comparisons.length
+        ? `<div class="jp-customizer__comparison" aria-label="Saved combinations"><div class="jp-customizer__subhead"><span>Compare combinations</span><small>${state.comparisons.length}/3 saved</small></div><div class="jp-customizer__comparison-grid">${state.comparisons
+            .map(
+              (item, index) => `<article class="jp-customizer__comparison-card"><button type="button" class="jp-customizer__remove" data-jp-customizer-remove="${index}" aria-label="Remove comparison">Remove</button>${customizerPreview(item.frame, item.lens, true)}<strong>${escapeHtml(item.frame.name)}</strong><small>${escapeHtml(item.lens.name)} · ${escapeHtml(customizerMoney(item.total, item.frame.currency || "USD"))}</small></article>`,
+            )
+            .join("")}</div></div>`
+        : "";
+
+      customizer.innerHTML = `<div class="jp-customizer__head"><div><h2 id="jp-customizer-title">Build your pair</h2><p>Choose a frame, then make it yours with a lens that changes the look.</p></div><span class="jp-customizer__live">Live preview</span></div>
+        <div class="jp-customizer__layout">
+          <div class="jp-customizer__visual"><div class="jp-customizer__visual-label"><span>Now viewing</span><strong>${escapeHtml(frame.name)}</strong></div>${customizerPreview(frame, lens)}<div class="jp-customizer__visual-foot"><span>${escapeHtml(lens.name)}</span><strong>${escapeHtml(customizerMoney(total, frame.currency || lens.currency || "USD"))}</strong></div></div>
+          <div class="jp-customizer__controls">
+            <div class="jp-customizer__section"><div class="jp-customizer__subhead"><span>1 / Frame</span><small>${visibleFrames.length} available</small></div><div class="jp-customizer__filters"><label>Type<select data-jp-customizer-frame-type>${frameTypes.map((value) => `<option value="${escapeHtml(value)}"${value === state.frameType ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><label>Style<select data-jp-customizer-frame-style>${frameStyles.map((value) => `<option value="${escapeHtml(value)}"${value === state.frameStyle ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label></div><div class="jp-customizer__options">${cards || '<p class="jp-customizer__empty">No frames match these filters.</p>'}</div>${visibleFrames.length > 8 ? `<button type="button" class="jp-customizer__show-more" data-jp-customizer-show-all>${state.showAllFrames ? "Show fewer frames" : `View all ${visibleFrames.length} frames`}</button>` : ""}</div>
+            <div class="jp-customizer__section"><div class="jp-customizer__subhead"><span>2 / Lens</span><small>${lenses.length} compatible</small></div><div class="jp-customizer__lens-options">${lensCards}</div></div>
+            <div class="jp-customizer__actions"><button type="button" class="jp-customizer__compare" data-jp-customizer-compare${state.comparisons.length >= 3 ? " disabled" : ""}>${state.comparisons.length >= 3 ? "Comparison saved" : "Save to compare"}</button><button type="button" class="jp-customizer__add" data-jp-customizer-add>Add pair to bag <span>${escapeHtml(customizerMoney(total, frame.currency || lens.currency || "USD"))}</span></button></div>
+            ${comparisonMarkup}
+          </div>
+        </div>`;
+      applyCustomizerPreviewMasks(customizer);
+    };
+
+    customizer.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-jp-customizer-frame], [data-jp-customizer-lens], [data-jp-customizer-show-all], [data-jp-customizer-compare], [data-jp-customizer-remove], [data-jp-customizer-add]");
+      if (!target) return;
+      if (target.dataset.jpCustomizerFrame) state.frameId = target.dataset.jpCustomizerFrame;
+      if (target.dataset.jpCustomizerLens) state.lensId = target.dataset.jpCustomizerLens;
+      if (target.hasAttribute("data-jp-customizer-show-all")) state.showAllFrames = !state.showAllFrames;
+      if (target.dataset.jpCustomizerRemove !== undefined) state.comparisons.splice(Number(target.dataset.jpCustomizerRemove), 1);
+      if (target.hasAttribute("data-jp-customizer-compare")) {
+        const frame = customizerData?.frames.find((item) => String(item.id) === state.frameId);
+        const lens = customizerData?.lenses.find((item) => String(item.id) === state.lensId);
+        if (frame && lens && state.comparisons.length < 3) {
+          state.comparisons.push({ frame, lens, total: Number(frame.price || 0) + Number(lens.price || 0) });
+          showToast("Combination saved for comparison");
+        }
+      }
+      if (target.hasAttribute("data-jp-customizer-add")) {
+        const frame = customizerData?.frames.find((item) => String(item.id) === state.frameId);
+        const lens = customizerData?.lenses.find((item) => String(item.id) === state.lensId);
+        if (!frame || !lens) return;
+        const total = Number(frame.price || 0) + Number(lens.price || 0);
+        const url = frame.productUrl || `/product/${productId}`;
+        const cart = readCart();
+        const existing = cart.find((item) => item.url === url && item.customizer?.frameId === frame.id && item.customizer?.lensId === lens.id);
+        if (existing) existing.quantity = Number(existing.quantity || 0) + 1;
+        else cart.push({
+          name: `${frame.name} / ${lens.name}`,
+          url,
+          quantity: 1,
+          image: frame.imageUrl || "",
+          price: customizerMoney(total, frame.currency || lens.currency || "USD"),
+          priceValue: total,
+          customizer: {
+            frameId: frame.id,
+            frameName: frame.name,
+            frameImageUrl: frame.imageUrl || "",
+            frameLensMaskUrl: frame.lensMaskUrl || "",
+            frameStyle: frame.style || "Classic",
+            frameMetadata: frame.metadata || null,
+            lensId: lens.id,
+            lensName: lens.name,
+            lensType: lens.lensType,
+            lensColor: lens.color,
+            lensColorCode: lens.colorCode,
+            lensOpacity: lens.tintOpacity,
+            lensStyle: lens.style,
+          },
+        });
+        writeCart(cart);
+        updateCartBadge();
+        showToast(`${frame.name} with ${lens.name} added to your bag`);
+      }
+      if (customizerData) render(customizerData);
+    });
+
+    customizer.addEventListener("change", (event) => {
+      const target = event.target;
+      if (target.matches("[data-jp-customizer-frame-type]")) state.frameType = target.value;
+      if (target.matches("[data-jp-customizer-frame-style]")) state.frameStyle = target.value;
+      state.showAllFrames = false;
+      if (customizerData) render(customizerData);
+    });
+
+    fetch("/api/customizer", { credentials: "same-origin" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Customizer unavailable");
+        return response.json();
+      })
+      .then((data) => {
+        customizerData = data;
+        render(data);
+      })
+      .catch(() => {
+        customizer.innerHTML = '<p class="jp-customizer__error">We could not load customization options. Refresh to try again.</p>';
+      });
+  };
+
   const setupProductActions = () => {
     const productButtons = Array.from(document.querySelectorAll('button[aria-label^="Add "][aria-label$=" to bag"]'));
     if (window.location.pathname.startsWith("/product/")) {
@@ -902,11 +1207,20 @@
       main.innerHTML = `
         <div class="jp-cart-layout">
           <section class="jp-cart-items" aria-label="Shopping bag items">
-            ${cart.map((item, index) => `<article class="jp-cart-item" data-jp-cart-index="${index}">
-              <a class="jp-cart-image" href="${escapeHtml(item.url)}"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}"></a>
+            ${cart.map((item, index) => {
+              const customization = item.customizer && typeof item.customizer === "object" ? item.customizer : null;
+              const meta = customization
+                ? `${customization.frameName || "Selected frame"} · ${customization.lensName || "Selected lens"}`
+                : "COLOR / STANDARD";
+              const customizationDetails = customization
+                ? `<div class="jp-cart-customization"><span>Frame</span><strong>${escapeHtml(customization.frameName || "Selected frame")}</strong><span>Lens</span><strong>${escapeHtml(customization.lensName || "Selected lens")}</strong></div>`
+                : "";
+              return `<article class="jp-cart-item${customization ? " jp-cart-item--customized" : ""}" data-jp-cart-index="${index}">
+              <a class="jp-cart-image" href="${escapeHtml(item.url)}">${customizerCartPreview(item)}</a>
               <div class="jp-cart-info">
                 <a class="jp-cart-name" href="${escapeHtml(item.url)}">${escapeHtml(item.name)}</a>
-                <p class="jp-cart-meta">COLOR / STANDARD</p>
+                <p class="jp-cart-meta">${escapeHtml(meta)}</p>
+                ${customizationDetails}
                 <div class="jp-cart-controls">
                   <div class="jp-cart-quantity" aria-label="Quantity for ${escapeHtml(item.name)}">
                     <button type="button" data-jp-cart-decrease aria-label="Decrease quantity">−</button>
@@ -917,7 +1231,8 @@
                 </div>
               </div>
               <p class="jp-cart-price">${escapeHtml(item.price)}</p>
-            </article>`).join("")}
+            </article>`;
+            }).join("")}
             <div class="jp-cart-actions"><button type="button" data-jp-cart-clear>Clear bag</button><a href="/lenses/19">Add prescription</a><a href="/shop">Continue shopping</a></div>
           </section>
           <aside class="jp-cart-summary" aria-label="Order summary">
@@ -929,6 +1244,7 @@
             <p class="jp-cart-tax">${escapeHtml(taxNote)}</p>
           </aside>
         </div>`;
+      applyCustomizerPreviewMasks(main);
     };
 
     main.addEventListener("click", (event) => {
@@ -951,10 +1267,17 @@
         const items = cart
           .map((item) => {
             const match = String(item.url || "").match(/\/product\/(\d+)/);
+            const customization = item.customizer && typeof item.customizer === "object" ? item.customizer : null;
             return match
               ? {
                   productId: Number(match[1]),
                   quantity: Math.max(1, Number(item.quantity) || 1),
+                  ...(customizerUuid(customization?.frameId) && customizerUuid(customization?.lensId)
+                    ? {
+                        customizerFrameId: customization.frameId,
+                        customizerLensId: customization.lensId,
+                      }
+                    : {}),
                 }
               : null;
           })
@@ -2147,6 +2470,9 @@
       "categories",
       "subcategories",
       "collections",
+      "customizer_frames",
+      "customizer_lenses",
+      "customizer_frame_lenses",
     ]);
     const contentTopics = new Set([
       "hero_slides",
@@ -2179,7 +2505,8 @@
           if (grid) delete grid.dataset.jpCatalogBound;
           setupShopCatalog();
         } else if (/^\/product\/\d+\/?$/.test(path)) {
-          setupProductMedia();
+          if ([...topics].some((topic) => topic.startsWith("customizer_"))) window.location.reload();
+          else setupProductMedia();
         }
       }
 
@@ -2222,6 +2549,7 @@
   };
 
   setupProductActions();
+  setupProductCustomizer();
   setupCartPage();
   setupCarousels();
   setupBestSellerTabs();

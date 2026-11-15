@@ -26,6 +26,9 @@ Migrations live in `supabase/migrations/` and are ordered:
 3. `202611140003_rls.sql` — row-level security, grants, role-escalation guard.
 4. `202611140004_admin.sql` - category/hero image columns, initial-admin helper, `site_events`, and change-event triggers.
 5. `202611140005_products_id_seq.sql` - generated product ID sequence used by admin product creation.
+6. `202611150001_eyewear_customizer.sql` - managed frame/lens catalogs, compatibility relationships, RLS, and live-update triggers.
+7. `202611150002_customizer_orders.sql` - server-verified custom frame/lens order pricing.
+8. `202611150003_customizer_preview_fit.sql` - optional frame-aligned lens mask assets for accurate live previews.
 
 With the Supabase CLI:
 
@@ -73,6 +76,7 @@ The storefront receives changes through `/api/realtime` as Server-Sent Events. T
 | --- | --- | --- | --- |
 | `/api/health` | GET | none | configuration status |
 | `/api/catalog` | GET | none | products, collections, categories (60s cache) |
+| `/api/customizer` | GET | none | active frames, lenses, compatibility, and preview pricing |
 | `/api/content` | GET | none | hero, looks, reels, announcements, delivery, FAQs, reviews |
 | `/api/accounts/register` | POST | none | create Supabase user + customer profile |
 | `/api/accounts/login` | POST | none | sign in, sets HttpOnly cookies |

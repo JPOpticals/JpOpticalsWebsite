@@ -329,6 +329,80 @@ const collections = collectionFiles.map(collectionFromHtml).map((collection) => 
 const faqs = faqFromHtml();
 const reviews = reviewsFromHomepage();
 const variants = variantsFromSite(products);
+const customizerLenses = [
+  {
+    id: "11111111-aaaa-4aaa-8aaa-111111111111",
+    name: "Clear optical",
+    lensType: "Clear",
+    style: "Classic",
+    color: "Clear",
+    colorCode: "#e8eef1",
+    tintOpacity: 0.18,
+    price: 0,
+    description: "Everyday clear lenses with a subtle natural reflection.",
+    sortOrder: 0,
+  },
+  {
+    id: "22222222-bbbb-4bbb-8bbb-222222222222",
+    name: "Blue light filter",
+    lensType: "Blue-light",
+    style: "Performance",
+    color: "Ice blue",
+    colorCode: "#9ed5e7",
+    tintOpacity: 0.28,
+    price: 65,
+    description: "A light blue filter for screen-heavy days.",
+    sortOrder: 1,
+  },
+  {
+    id: "33333333-cccc-4ccc-8ccc-333333333333",
+    name: "Smoke grey",
+    lensType: "Tinted",
+    style: "Solid tint",
+    color: "Smoke",
+    colorCode: "#6e777b",
+    tintOpacity: 0.58,
+    price: 85,
+    description: "A soft grey tint with a clean, neutral finish.",
+    sortOrder: 2,
+  },
+  {
+    id: "44444444-dddd-4ddd-8ddd-444444444444",
+    name: "Warm amber",
+    lensType: "Tinted",
+    style: "Solid tint",
+    color: "Amber",
+    colorCode: "#c28b55",
+    tintOpacity: 0.52,
+    price: 85,
+    description: "A warm amber lens for a richer, vintage look.",
+    sortOrder: 3,
+  },
+  {
+    id: "55555555-eeee-4eee-8eee-555555555555",
+    name: "Polarized olive",
+    lensType: "Polarized",
+    style: "Performance",
+    color: "Olive",
+    colorCode: "#65715d",
+    tintOpacity: 0.64,
+    price: 120,
+    description: "Polarized protection with an olive-green cast.",
+    sortOrder: 4,
+  },
+  {
+    id: "66666666-ffff-4fff-8fff-666666666666",
+    name: "Photochromic",
+    lensType: "Photochromic",
+    style: "Adaptive",
+    color: "Graphite",
+    colorCode: "#53616b",
+    tintOpacity: 0.48,
+    price: 145,
+    description: "Adaptive lenses that deepen in sunlight.",
+    sortOrder: 5,
+  },
+];
 
 const statements = [];
 const push = (statement) => statements.push(statement);
@@ -484,6 +558,74 @@ insertRows(
   "product_id, url",
 );
 statements.push(...primaryUpdates);
+
+insertRows(
+  "customizer_frames",
+  [
+    "id",
+    "product_id",
+    "name",
+    "style",
+    "frame_type",
+    "material",
+    "color",
+    "color_code",
+    "image_url",
+    "image_alt",
+    "price",
+    "currency",
+    "description",
+    "sort_order",
+  ],
+  products.map((product) => [
+    q(uuidFrom(`customizer-frame:${product.id}`)),
+    product.id,
+    q(product.name),
+    q(product.shape || "Classic"),
+    q(/^optical$/i.test(product.frameType) ? "Optical" : /sunglasses/i.test(product.frameType) ? "Sunglasses" : "Eyewear"),
+    q(product.material),
+    q(product.color),
+    q(product.colorCode),
+    q(product.primaryImage),
+    q(product.name),
+    product.price ?? 0,
+    q(product.currency),
+    q(product.shortDescription || product.description),
+    product.sortOrder ?? product.id,
+  ]),
+  "id",
+);
+
+insertRows(
+  "customizer_lenses",
+  [
+    "id",
+    "name",
+    "lens_type",
+    "style",
+    "color",
+    "color_code",
+    "tint_opacity",
+    "price",
+    "currency",
+    "description",
+    "sort_order",
+  ],
+  customizerLenses.map((lens) => [
+    q(lens.id),
+    q(lens.name),
+    q(lens.lensType),
+    q(lens.style),
+    q(lens.color),
+    q(lens.colorCode),
+    lens.tintOpacity,
+    lens.price,
+    q("USD"),
+    q(lens.description),
+    lens.sortOrder,
+  ]),
+  "id",
+);
 
 insertRows(
   "product_variants",
@@ -653,7 +795,7 @@ insertRows(
 push("commit;");
 push("");
 push(
-  `-- Summary: ${products.length} products, ${collections.length} collections, ${imageRows.length} images, ${variants.length} variants, ${faqs.length} FAQs, ${reviews.length} reviews.`,
+  `-- Summary: ${products.length} products, ${collections.length} collections, ${imageRows.length} images, ${variants.length} variants, ${customizerLenses.length} lenses, ${faqs.length} FAQs, ${reviews.length} reviews.`,
 );
 
 fs.mkdirSync(SEED_DIR, { recursive: true });
@@ -678,6 +820,6 @@ fs.writeFileSync(
 );
 
 console.log(
-  `Seeded data: ${products.length} products, ${collections.length} collections, ${imageRows.length} images, ${variants.length} variants, ${faqs.length} FAQs, ${reviews.length} reviews.`,
+  `Seeded data: ${products.length} products, ${collections.length} collections, ${imageRows.length} images, ${variants.length} variants, ${customizerLenses.length} lenses, ${faqs.length} FAQs, ${reviews.length} reviews.`,
 );
 console.log(`Wrote ${path.join("supabase", "seed", "seed.sql")}`);

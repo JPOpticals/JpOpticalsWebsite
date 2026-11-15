@@ -9,7 +9,13 @@ export const dynamic = "force-dynamic";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-type OrderItemInput = { productId?: unknown; variantId?: unknown; quantity?: unknown };
+type OrderItemInput = {
+  productId?: unknown;
+  variantId?: unknown;
+  customizerFrameId?: unknown;
+  customizerLensId?: unknown;
+  quantity?: unknown;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,10 +69,18 @@ export async function POST(request: NextRequest) {
       if (!Number.isInteger(productId) || productId <= 0) {
         throw new HttpError(400, "Invalid product in order.");
       }
+      const customizerFrameId = String(item.customizerFrameId ?? "").trim();
+      const customizerLensId = String(item.customizerLensId ?? "").trim();
+      if ((customizerFrameId && !customizerLensId) || (!customizerFrameId && customizerLensId)) {
+        throw new HttpError(400, "A custom frame and lens must be selected together.");
+      }
       return {
         productId,
         quantity,
         ...(Number.isInteger(variantId) && variantId > 0 ? { variantId } : {}),
+        ...(customizerFrameId && customizerLensId
+          ? { customizerFrameId, customizerLensId }
+          : {}),
       };
     });
 
