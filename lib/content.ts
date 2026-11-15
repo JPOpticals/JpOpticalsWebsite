@@ -16,10 +16,8 @@ export type SiteContent = {
   popularSearches: string[];
 };
 
-let cache: { data: SiteContent; expiresAt: number } | null = null;
-
 export function invalidateContentCache() {
-  cache = null;
+  // The live content projection intentionally reads current Supabase state on each request.
 }
 
 const formatMoney = (value: number | null) => {
@@ -234,8 +232,6 @@ async function supabaseContent(): Promise<SiteContent> {
 }
 
 export async function getSiteContent(): Promise<SiteContent> {
-  if (cache && cache.expiresAt > Date.now()) return cache.data;
-
   let data: SiteContent;
   if (isSupabaseConfigured) {
     try {
@@ -248,6 +244,5 @@ export async function getSiteContent(): Promise<SiteContent> {
     data = seedContent();
   }
 
-  cache = { data, expiresAt: Date.now() + 60_000 };
   return data;
 }

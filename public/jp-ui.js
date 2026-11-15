@@ -2379,6 +2379,97 @@
     setupReviewCarousel(section, container);
   };
 
+  const setupAnnouncements = async () => {
+    const content = await loadContent();
+    const announcements = Array.isArray(content?.announcements)
+      ? content.announcements.filter((announcement) => String(announcement?.message || "").trim())
+      : [];
+    const validHref = (value) => {
+      const href = String(value || "").trim();
+      if (!href) return "";
+      if (href.startsWith("/") && !href.startsWith("//")) return href;
+      try {
+        const url = new URL(href, window.location.origin);
+        return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+      } catch {
+        return "";
+      }
+    };
+    const render = (mount, items, modifier) => {
+      if (!items.length) {
+        mount?.remove();
+        return;
+      }
+      mount.className = `jp-announcements ${modifier}`;
+      mount.replaceChildren(
+        ...items.map((announcement) => {
+          const row = document.createElement("div");
+          row.className = "jp-announcement";
+          const message = document.createElement("span");
+          message.textContent = announcement.message;
+          row.appendChild(message);
+          const href = validHref(announcement.linkHref);
+          if (href && announcement.linkLabel) {
+            const link = document.createElement("a");
+            link.href = href;
+            link.textContent = announcement.linkLabel;
+            if (/^https?:\/\//i.test(href) && !href.startsWith(window.location.origin)) {
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+            }
+            row.appendChild(link);
+          }
+          return row;
+        }),
+      );
+      if (modifier === "jp-announcements--modal") {
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "jp-announcement-modal__close";
+        close.setAttribute("aria-label", "Dismiss announcement");
+        close.textContent = "×";
+        close.addEventListener("click", () => mount.remove());
+        mount.appendChild(close);
+      }
+    };
+    const mountFor = (placement, create) => {
+      let mount = document.querySelector(`[data-jp-announcements="${placement}"]`);
+      if (mount || !create) return mount;
+      mount = document.createElement("aside");
+      mount.dataset.jpAnnouncements = placement;
+      create(mount);
+      return mount;
+    };
+
+    const topbarItems = announcements.filter((announcement) => announcement.placement === "topbar");
+    const header = document.querySelector("header");
+    const topbar = mountFor("topbar", (mount) => header?.parentElement?.appendChild(mount));
+    if (topbar && topbarItems.length) render(topbar, topbarItems, "jp-announcements--topbar");
+    else topbar?.remove();
+
+    const homepageItems = announcements.filter((announcement) => announcement.placement === "homepage");
+    const hero = document.querySelector('button[aria-label^="Go to "]')?.closest("section");
+    const homepage = mountFor("homepage", (mount) => hero?.after(mount));
+    if (homepage && homepageItems.length) render(homepage, homepageItems, "jp-announcements--homepage");
+    else homepage?.remove();
+
+    const footerItems = announcements.filter((announcement) => announcement.placement === "footer");
+    const footer = document.querySelector("footer");
+    const footerMount = mountFor("footer", (mount) => footer?.before(mount));
+    if (footerMount && footerItems.length) render(footerMount, footerItems, "jp-announcements--footer");
+    else footerMount?.remove();
+
+    const modalItems = announcements.filter((announcement) => announcement.placement === "modal");
+    const modal = mountFor("modal", (mount) => document.body.appendChild(mount));
+    if (modal && modalItems.length) {
+      modal.setAttribute("role", "dialog");
+      modal.setAttribute("aria-label", "Announcement");
+      render(modal, modalItems, "jp-announcements--modal");
+    } else {
+      modal?.remove();
+    }
+  };
+
   const setupProductMedia = () => {
     const match = window.location.pathname.match(/^\/product\/(\d+)\/?$/);
     if (!match) return;
@@ -2601,6 +2692,8 @@
           const grid = document.querySelector("main > .grid");
           if (grid) delete grid.dataset.jpCatalogBound;
           setupShopCatalog();
+        } else if (path === "/customize" && [...topics].some((topic) => topic.startsWith("customizer_"))) {
+          reload();
         } else if (/^\/product\/\d+\/?$/.test(path)) {
           if ([...topics].some((topic) => topic.startsWith("customizer_"))) window.location.reload();
           else setupProductMedia();
@@ -2611,6 +2704,7 @@
         contentPromise = null;
         setupFaqContent();
         setupHomepageReviews();
+        setupAnnouncements();
         const path = window.location.pathname;
         const needsReload =
           (path === "/" &&
@@ -2664,6 +2758,7 @@
   setupForms();
   setupFaqContent();
   setupHomepageReviews();
+  setupAnnouncements();
   setupHomepageProductLinks();
   setupProfilePage();
   setupCallButton();

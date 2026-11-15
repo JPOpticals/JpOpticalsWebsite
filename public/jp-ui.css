@@ -51,6 +51,72 @@ body {
   outline-offset: 3px;
 }
 
+.jp-announcements {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #e5e2df;
+  background: #f4f2ef;
+  color: #171513;
+  font-family: var(--font-nav), var(--font-work-sans), sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1.45;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.jp-announcement {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+  padding: 12px 20px;
+}
+
+.jp-announcement a {
+  border-bottom: 1px solid currentColor;
+  color: inherit;
+  text-decoration: none;
+}
+
+.jp-announcement a:hover {
+  opacity: 0.62;
+}
+
+.jp-announcements--topbar {
+  border-top: 1px solid #e5e2df;
+}
+
+.jp-announcements--homepage {
+  margin: 0;
+}
+
+.jp-announcements--footer {
+  border-top: 1px solid #e5e2df;
+}
+
+.jp-announcements--modal {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 5000;
+  width: min(420px, calc(100vw - 40px));
+  border: 1px solid #d7d3cf;
+  box-shadow: 0 18px 48px rgb(23 21 19 / 18%);
+}
+
+.jp-announcement-modal__close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
 .jp-toast {
   position: fixed;
   right: 20px;
@@ -292,7 +358,7 @@ body.jp-customizer-page {
   gap: 9px;
   color: #444;
   font-family: var(--font-nav), Arial, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   text-decoration: none;
 }
 
@@ -314,7 +380,7 @@ body.jp-customizer-page {
   margin: 0;
   color: #666;
   font-family: var(--font-nav), Arial, sans-serif;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .jp-customizer-page__footer {
@@ -398,7 +464,7 @@ body.jp-customizer-page {
 .jp-customizer__head h2 {
   margin: 0;
   font-family: var(--font-display), Georgia, serif;
-  font-size: 34px;
+  font-size: 38px;
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.05;
@@ -408,7 +474,7 @@ body.jp-customizer-page {
   max-width: 44ch;
   margin: 8px 0 0;
   color: #666;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.55;
 }
 
@@ -417,7 +483,7 @@ body.jp-customizer-page {
   padding: 9px 12px;
   border: 1px solid #d7d3cf;
   color: #555;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -447,7 +513,7 @@ body.jp-customizer-page {
 .jp-customizer__visual-label {
   padding-bottom: 12px;
   color: #777;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -463,12 +529,12 @@ body.jp-customizer-page {
 .jp-customizer__visual-foot {
   padding-top: 12px;
   color: #555;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .jp-customizer__visual-foot strong {
   color: #111;
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 500;
 }
 
@@ -577,14 +643,14 @@ body.jp-customizer-page {
 .jp-customizer__subhead {
   margin-bottom: 14px;
   color: #111;
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .jp-customizer__subhead small {
   color: #888;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -598,7 +664,7 @@ body.jp-customizer-page {
 
 .jp-customizer__filters label {
   color: #777;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -614,7 +680,7 @@ body.jp-customizer-page {
   background: #fff;
   color: #111;
   font: inherit;
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -681,22 +747,22 @@ body.jp-customizer-page {
 }
 
 .jp-customizer__option-name {
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.35;
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1.3;
   display: -webkit-box;
-  min-height: 30px;
+  min-height: 0;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .jp-customizer__option-meta {
-  margin-top: 4px;
+  margin-top: 3px;
   color: #888;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 1.3;
   display: -webkit-box;
-  min-height: 24px;
+  min-height: 0;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -713,9 +779,9 @@ body.jp-customizer-page {
 }
 
 .jp-customizer__swatch {
-  width: 14px;
-  height: 14px;
-  margin: 10px 9px 0;
+  width: 16px;
+  height: 16px;
+  margin: 8px 9px 0;
 }
 
 .jp-customizer__show-more {
@@ -725,7 +791,7 @@ body.jp-customizer-page {
   border: 1px solid #d7d3cf;
   background: #fff;
   color: #333;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .jp-customizer__empty {
@@ -768,20 +834,20 @@ body.jp-customizer-page {
 }
 
 .jp-customizer__lens-option strong {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 500;
 }
 
 .jp-customizer__lens-option small {
   margin-top: 4px;
   color: #888;
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .jp-customizer__lens-price {
   margin-left: auto;
   color: #555;
-  font-size: 14px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -797,7 +863,7 @@ body.jp-customizer-page {
   min-height: 56px;
   padding: 12px 15px;
   border: 1px solid #111;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -822,7 +888,7 @@ body.jp-customizer-page {
 }
 
 .jp-customizer__add span {
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 0;
 }
 
@@ -856,14 +922,14 @@ body.jp-customizer-page {
 
 .jp-customizer__comparison-card strong {
   margin-top: 7px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .jp-customizer__comparison-card small {
   margin-top: 3px;
   color: #888;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .jp-customizer__remove {
@@ -967,7 +1033,7 @@ body.jp-customizer-page {
 @media (max-width: 560px) {
   .jp-customizer--standalone .jp-customizer__head h1,
   .jp-customizer--standalone .jp-customizer__head h2 {
-    font-size: 30px;
+    font-size: 32px;
   }
 
   .jp-customizer--standalone .jp-customizer__options {
@@ -979,7 +1045,7 @@ body.jp-customizer-page {
   }
 
   .jp-customizer__head p {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .jp-customizer__filters {

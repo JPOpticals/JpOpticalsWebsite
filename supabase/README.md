@@ -29,6 +29,7 @@ Migrations live in `supabase/migrations/` and are ordered:
 6. `202611150001_eyewear_customizer.sql` - managed frame/lens catalogs, compatibility relationships, RLS, and live-update triggers.
 7. `202611150002_customizer_orders.sql` - server-verified custom frame/lens order pricing.
 8. `202611150003_customizer_preview_fit.sql` - optional frame-aligned lens mask assets for accurate live previews.
+9. `202611150004_admin_realtime_events.sql` - change-stream triggers for customer, inquiry, and newsletter writes.
 
 With the Supabase CLI:
 

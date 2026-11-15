@@ -184,10 +184,8 @@ const DEFAULT_LENSES: CustomizerLens[] = [
   },
 ];
 
-let cache: { data: CustomizerResponse; expiresAt: number } | null = null;
-
 export function invalidateCustomizerCache() {
-  cache = null;
+  // The live projections intentionally read current Supabase state on each request.
 }
 
 const numberValue = (value: unknown, fallback = 0) => {
@@ -324,8 +322,6 @@ async function supabaseCustomizer(): Promise<CustomizerResponse> {
 }
 
 export async function getCustomizer(): Promise<CustomizerResponse> {
-  if (cache && cache.expiresAt > Date.now()) return cache.data;
-
   const catalog = await getCatalog();
   let data: CustomizerResponse;
   if (isSupabaseConfigured) {
@@ -339,6 +335,5 @@ export async function getCustomizer(): Promise<CustomizerResponse> {
     data = staticCustomizer(catalog);
   }
 
-  cache = { data, expiresAt: Date.now() + 60_000 };
   return data;
 }

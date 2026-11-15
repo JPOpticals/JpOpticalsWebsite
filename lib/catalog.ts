@@ -61,8 +61,6 @@ type CatalogSubcategoryRow = {
   description: string | null;
 };
 
-let cache: { data: CatalogResponse; expiresAt: number } | null = null;
-
 export type CatalogResponse = {
   generatedAt: string;
   source: "supabase" | "static" | "empty";
@@ -72,7 +70,7 @@ export type CatalogResponse = {
 };
 
 export function invalidateCatalogCache() {
-  cache = null;
+  // The live catalog intentionally reads current Supabase state on each request.
 }
 
 const formatMoney = (value: number | null, currency = "USD") => {
@@ -261,8 +259,6 @@ async function supabaseCatalog(): Promise<CatalogResponse> {
 }
 
 export async function getCatalog(): Promise<CatalogResponse> {
-  if (cache && cache.expiresAt > Date.now()) return cache.data;
-
   let data: CatalogResponse;
   if (isSupabaseConfigured) {
     try {
@@ -275,6 +271,5 @@ export async function getCatalog(): Promise<CatalogResponse> {
     data = staticCatalog();
   }
 
-  cache = { data, expiresAt: Date.now() + 60_000 };
   return data;
 }
