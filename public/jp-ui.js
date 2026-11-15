@@ -139,6 +139,23 @@
       nav.classList.add("jp-nav-relocated");
     }
 
+    if (nav && !nav.querySelector('a[href="/customize"]')) {
+      const template = nav.querySelector("a");
+      if (template) {
+        const customizeLink = template.cloneNode(false);
+        customizeLink.href = "/customize";
+        customizeLink.dataset.jpCustomizerNav = "true";
+        customizeLink.textContent = "Customize";
+        const underline = document.createElement("span");
+        underline.className = "absolute inset-x-0 bottom-0 h-[2px] origin-center bg-current transition-transform duration-500 ease-luxe scale-x-0";
+        customizeLink.appendChild(underline);
+        const helpLink = Array.from(nav.querySelectorAll("a")).find((link) =>
+          link.textContent.trim().toLowerCase() === "help",
+        );
+        nav.insertBefore(customizeLink, helpLink || null);
+      }
+    }
+
     header.querySelectorAll('a[href="/"]').forEach((link) => {
       if (link.textContent.trim() !== "JP") return;
       const isMobileLogo = (link.className || "").includes("lg:hidden");
@@ -922,23 +939,17 @@
   };
 
   const setupProductCustomizer = () => {
-    const match = window.location.pathname.match(/^\/product\/(\d+)\/?$/);
-    if (!match || document.querySelector(".jp-customizer")) return;
-    const productId = Number(match[1]);
-    const title = document.querySelector("main h1");
-    const info = title?.closest('div[class*="lg:col-start-2"]');
-    const main = document.querySelector("main");
-    const host = info || main;
+    const isStandalone = window.location.pathname === "/customize";
+    if (!isStandalone || document.querySelector(".jp-customizer")) return;
+    const productId = Number(new URLSearchParams(window.location.search).get("productId") || 0);
+    const host = document.querySelector("[data-jp-customizer-page]");
     if (!host) return;
-    const productGrid = info?.parentElement;
 
     const customizer = document.createElement("section");
-    customizer.className = "jp-customizer";
-    if (productGrid) customizer.classList.add("jp-customizer--full");
+    customizer.className = "jp-customizer jp-customizer--standalone";
     customizer.setAttribute("aria-labelledby", "jp-customizer-title");
     customizer.innerHTML = '<div class="jp-customizer__loading">Loading frame and lens options…</div>';
-    if (productGrid) productGrid.appendChild(customizer);
-    else if (host) host.appendChild(customizer);
+    host.appendChild(customizer);
 
     const state = {
       frameId: "",
@@ -1003,6 +1014,7 @@
         })
         .join("");
       const total = Number(frame.price || 0) + Number(lens.price || 0);
+      const headingTag = isStandalone ? "h1" : "h2";
       const comparisonMarkup = state.comparisons.length
         ? `<div class="jp-customizer__comparison" aria-label="Saved combinations"><div class="jp-customizer__subhead"><span>Compare combinations</span><small>${state.comparisons.length}/3 saved</small></div><div class="jp-customizer__comparison-grid">${state.comparisons
             .map(
@@ -1011,7 +1023,7 @@
             .join("")}</div></div>`
         : "";
 
-      customizer.innerHTML = `<div class="jp-customizer__head"><div><h2 id="jp-customizer-title">Build your pair</h2><p>Choose a frame, then make it yours with a lens that changes the look.</p></div><span class="jp-customizer__live">Live preview</span></div>
+      customizer.innerHTML = `<div class="jp-customizer__head"><div><${headingTag} id="jp-customizer-title">Build your pair</${headingTag}><p>Choose a frame, then make it yours with a lens that changes the look.</p></div><span class="jp-customizer__live">Live preview</span></div>
         <div class="jp-customizer__layout">
           <div class="jp-customizer__visual"><div class="jp-customizer__visual-label"><span>Now viewing</span><strong>${escapeHtml(frame.name)}</strong></div>${customizerPreview(frame, lens)}<div class="jp-customizer__visual-foot"><span>${escapeHtml(lens.name)}</span><strong>${escapeHtml(customizerMoney(total, frame.currency || lens.currency || "USD"))}</strong></div></div>
           <div class="jp-customizer__controls">
@@ -1044,7 +1056,7 @@
         const lens = customizerData?.lenses.find((item) => String(item.id) === state.lensId);
         if (!frame || !lens) return;
         const total = Number(frame.price || 0) + Number(lens.price || 0);
-        const url = frame.productUrl || `/product/${productId}`;
+        const url = frame.productUrl || (productId ? `/product/${productId}` : "/shop");
         const cart = readCart();
         const existing = cart.find((item) => item.url === url && item.customizer?.frameId === frame.id && item.customizer?.lensId === lens.id);
         if (existing) existing.quantity = Number(existing.quantity || 0) + 1;
@@ -1098,6 +1110,33 @@
       .catch(() => {
         customizer.innerHTML = '<p class="jp-customizer__error">We could not load customization options. Refresh to try again.</p>';
       });
+  };
+
+  const setupCustomizerNavigation = () => {
+    const productMatch = window.location.pathname.match(/^\/product\/(\d+)\/?$/);
+    if (productMatch) {
+      const productId = Number(productMatch[1]);
+      const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
+        /add prescription lenses/i.test(candidate.textContent.trim()),
+      );
+      if (button && !button.dataset.jpCustomizerEntry) {
+        button.dataset.jpCustomizerEntry = "true";
+        button.type = "button";
+        button.textContent = "Customize frame & lenses";
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          window.location.href = `/customize?productId=${productId}`;
+        });
+      }
+    }
+
+    if (window.location.pathname !== "/customize") return;
+    const back = document.querySelector("[data-jp-customizer-back]");
+    if (!back) return;
+    const productId = Number(new URLSearchParams(window.location.search).get("productId") || 0);
+    back.setAttribute("href", productId ? `/product/${productId}` : "/shop");
+    const label = back.querySelector("span");
+    if (label) label.textContent = productId ? "Back to product" : "Back to eyewear";
   };
 
   const setupProductActions = () => {
@@ -2607,6 +2646,7 @@
   };
 
   setupProductActions();
+  setupCustomizerNavigation();
   setupProductCustomizer();
   setupCartPage();
   setupCarousels();

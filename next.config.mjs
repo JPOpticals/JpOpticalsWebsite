@@ -37,7 +37,11 @@ const nextConfig = {
     }
 
     return {
-      beforeFiles: [{ source: '/', destination: '/index.html' }, ...mirrorRewrites],
+      beforeFiles: [
+        { source: '/', destination: '/index.html' },
+        { source: '/customize', destination: '/customize.html' },
+        ...mirrorRewrites,
+      ],
     };
   },
 };
