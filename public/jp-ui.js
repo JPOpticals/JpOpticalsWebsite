@@ -1399,7 +1399,6 @@
         startY = event.clientY;
         startOffset = offset;
         dragging = false;
-        viewport.setPointerCapture?.(pointerId);
       });
       viewport.addEventListener("pointermove", (event) => {
         if (event.pointerId !== pointerId) return;
@@ -1407,7 +1406,10 @@
         const dy = event.clientY - startY;
         if (!dragging && Math.abs(dx) < 8) return;
         if (!dragging && Math.abs(dy) > Math.abs(dx)) { finishPointer(); return; }
-        dragging = true;
+        if (!dragging) {
+          dragging = true;
+          viewport.setPointerCapture?.(pointerId);
+        }
         region.classList.add("jp-carousel-dragging");
         event.preventDefault();
         offset = Math.max(0, Math.min(maxOffset, startOffset - dx));
@@ -2154,6 +2156,61 @@
     });
   };
 
+  const setupHomepageProductLinks = () => {
+    if (window.location.pathname !== "/") return;
+    document.querySelectorAll('section a[href^="/product/"]').forEach((link) => {
+      if (link.dataset.jpProductLink) return;
+      link.dataset.jpProductLink = "true";
+      link.classList.add("jp-product-link");
+      link.addEventListener("click", (event) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey ||
+          link.target === "_blank"
+        ) {
+          return;
+        }
+        const href = link.getAttribute("href");
+        if (!href) return;
+        event.preventDefault();
+        window.location.assign(href);
+      });
+    });
+  };
+
+  const setupReviewCarousel = (section, container) => {
+    if (!section || !container || container.dataset.jpReviewsBound) return;
+    const previous = section.querySelector('button[aria-label="Previous reviews"]');
+    const next = section.querySelector('button[aria-label="Next reviews"]');
+    if (!previous || !next) return;
+
+    container.dataset.jpReviewsBound = "true";
+    container.classList.add("jp-reviews-track");
+    const updateControls = () => {
+      const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+      previous.disabled = container.scrollLeft <= 2;
+      next.disabled = container.scrollLeft >= maxScroll - 2;
+    };
+    const scrollReviews = (direction) => {
+      container.scrollBy({
+        left: direction * Math.max(container.clientWidth * 0.85, 320),
+        behavior: "smooth",
+      });
+    };
+
+    previous.type = "button";
+    next.type = "button";
+    previous.addEventListener("click", () => scrollReviews(-1));
+    next.addEventListener("click", () => scrollReviews(1));
+    container.addEventListener("scroll", updateControls, { passive: true });
+    window.addEventListener("resize", updateControls, { passive: true });
+    updateControls();
+  };
+
   const setupForms = () => {
     document.querySelectorAll("form").forEach((form) => {
       if (form.dataset.jpForm || form.dataset.jpSearchForm || form.dataset.jpBound) return;
@@ -2241,11 +2298,11 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus h-5 w-5 flex-shrink-0"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>';
     list.innerHTML = content.faqs
       .map(
-        (faq) => `<div class="border border-gray-200 rounded-lg overflow-hidden">
-          <button class="flex justify-between items-center w-full p-5 text-left font-medium focus:outline-none" type="button">
+        (faq, index) => `<div class="jp-faq-item border border-gray-200 rounded-lg overflow-hidden">
+          <button class="flex justify-between items-center w-full p-5 text-left font-medium focus:outline-none" type="button" aria-controls="jp-faq-answer-${index}" aria-expanded="false">
             <span>${escapeHtml(faq.question)}</span>${plus}
           </button>
-          <div class="overflow-hidden transition-all duration-300 max-h-0"><p class="text-gray-700">${escapeHtml(faq.answer)}</p></div>
+          <div id="jp-faq-answer-${index}" class="jp-faq-answer overflow-hidden transition-all duration-300 max-h-0"><p class="text-gray-700">${escapeHtml(faq.answer)}</p></div>
         </div>`,
       )
       .join("");
@@ -2280,6 +2337,7 @@
         </article>`;
       })
       .join("");
+    setupReviewCarousel(section, container);
   };
 
   const setupProductMedia = () => {
@@ -2566,6 +2624,7 @@
   setupForms();
   setupFaqContent();
   setupHomepageReviews();
+  setupHomepageProductLinks();
   setupProfilePage();
   setupCallButton();
   setupLiveUpdates();

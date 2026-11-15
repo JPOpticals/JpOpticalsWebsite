@@ -25,6 +25,32 @@ body {
   cursor: grabbing;
 }
 
+.jp-reviews-track {
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+}
+
+.jp-reviews-track::-webkit-scrollbar {
+  display: none;
+}
+
+.jp-faq-answer {
+  border-top: 1px solid #f0efed;
+}
+
+.jp-faq-answer > p {
+  margin: 0;
+  padding: 16px 20px 20px;
+  color: #344054;
+  line-height: 1.6;
+}
+
+.jp-faq-item > button:focus-visible,
+.jp-product-link:focus-visible {
+  outline: 1px solid #111;
+  outline-offset: 3px;
+}
+
 .jp-toast {
   position: fixed;
   right: 20px;
