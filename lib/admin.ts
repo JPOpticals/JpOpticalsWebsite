@@ -428,6 +428,34 @@ export async function deleteResourceRecord(
         await deleteFromImageKit(image.imagekit_file_id).catch(() => {});
       }
     }
+    const { data: variants } = await admin
+      .from("product_variants")
+      .select("image_file_id")
+      .eq("product_id", id);
+    for (const variant of (variants ?? []) as { image_file_id: string | null }[]) {
+      if (variant.image_file_id) {
+        await deleteFromImageKit(variant.image_file_id).catch(() => {});
+      }
+    }
+  }
+
+  if (resource.key === "product-variants") {
+    const { data: images } = await admin
+      .from("product_images")
+      .select("imagekit_file_id")
+      .eq("variant_id", id);
+    for (const image of (images ?? []) as { imagekit_file_id: string | null }[]) {
+      if (image.imagekit_file_id) {
+        await deleteFromImageKit(image.imagekit_file_id).catch(() => {});
+      }
+    }
+    const { data: variant } = await admin
+      .from("product_variants")
+      .select("image_file_id")
+      .eq("id", id)
+      .maybeSingle();
+    const fileId = (variant as { image_file_id: string | null } | null)?.image_file_id;
+    if (fileId) await deleteFromImageKit(fileId).catch(() => {});
   }
 
   const { error } = await admin.from(resource.table).delete().eq(resource.idColumn, id);

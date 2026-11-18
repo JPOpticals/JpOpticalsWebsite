@@ -17,6 +17,7 @@ const nextConfig = {
         const plain = [];
 
         for (const page of manifest) {
+          if (page.pathname === "/shop") continue;
           const destination = `/mirror/${page.file}`;
           if (page.match) {
             const has = [...new URLSearchParams(page.match).entries()].map(([key, value]) => ({
@@ -43,6 +44,18 @@ const nextConfig = {
         ...mirrorRewrites,
       ],
     };
+  },
+  async headers() {
+    return [
+      {
+        source: "/jp-ui.js",
+        headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }],
+      },
+      {
+        source: "/jp-ui.css",
+        headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }],
+      },
+    ];
   },
 };
 

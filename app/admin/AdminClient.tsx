@@ -128,7 +128,8 @@ type AdminIconName =
   | "search"
   | "star"
   | "trash"
-  | "upload";
+  | "upload"
+  | "layers";
 
 function AdminIcon({ name, size = 16 }: { name: AdminIconName; size?: number }) {
   const icon = (() => {
@@ -155,6 +156,8 @@ function AdminIcon({ name, size = 16 }: { name: AdminIconName; size?: number }) 
         return <><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></>;
       case "upload":
         return <><path d="M12 15V4M8 8l4-4 4 4" /><path d="M5 14v5h14v-5" /></>;
+      case "layers":
+        return <><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 13 9 5 9-5" /><path d="m3 17 9 5 9-5" /></>;
     }
   })();
 
@@ -320,6 +323,15 @@ const styles = `
   .jp-admin__close { border:1px solid #cfc6b8; background:transparent; border-radius:999px; width:30px; height:30px; cursor:pointer; font-size:16px; line-height:1; color:#1a1814; }
   .jp-admin__form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; }
   .jp-admin__field--full { grid-column:1 / -1; }
+  .jp-admin__order-items { margin-top:22px; padding-top:18px; border-top:1px solid #e1d9cc; }
+  .jp-admin__section-title { margin:0; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#7b7366; }
+  .jp-admin__order-items-list { display:grid; gap:10px; margin-top:12px; }
+  .jp-admin__order-item { padding:12px 14px; border:1px solid #e1d9cc; border-radius:10px; background:#fffdf9; }
+  .jp-admin__order-item > div { display:flex; align-items:baseline; justify-content:space-between; gap:14px; }
+  .jp-admin__order-item strong { font-size:12px; font-weight:600; }
+  .jp-admin__order-item > div span { color:#7b7366; font-size:11px; white-space:nowrap; }
+  .jp-admin__order-item p { display:grid; gap:3px; margin:9px 0 0; color:#403b34; font-size:12px; line-height:1.5; }
+  .jp-admin__order-item p span { color:#a4763e; font-size:9px; letter-spacing:.12em; text-transform:uppercase; }
   .jp-admin__field-note { font-size:10px; color:#8a8175; }
   .jp-admin__image-row { display:flex; gap:12px; align-items:center; }
   .jp-admin__image-row img { width:74px; height:58px; object-fit:cover; border-radius:8px; background:#eee7da; border:1px solid #ddd5c8; flex:none; }
@@ -1231,10 +1243,12 @@ function FieldControl({
 function ProductMedia({
   productId,
   productName,
+  variantId,
   onClose,
 }: {
   productId: number;
   productName: string;
+  variantId?: number;
   onClose: () => void;
 }) {
   const [images, setImages] = useState<AdminRecord[]>([]);
@@ -1248,14 +1262,15 @@ function ProductMedia({
 
   const load = useCallback(async () => {
     try {
-      const data = await request<{ images: AdminRecord[] }>(
-        `/api/admin/media?productId=${productId}`,
-      );
+      const query = variantId
+        ? `variantId=${variantId}`
+        : `productId=${productId}`;
+      const data = await request<{ images: AdminRecord[] }>(`/api/admin/media?${query}`);
       setImages(data.images || []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load images.");
     }
-  }, [productId]);
+  }, [productId, variantId]);
 
   useEffect(() => {
     void load();
@@ -1300,6 +1315,7 @@ function ProductMedia({
     setNotice("");
     const form = new FormData();
     form.append("productId", String(productId));
+    if (variantId) form.append("variantId", String(variantId));
     form.append("setPrimary", String(makePrimary));
     if (alt.trim()) form.append("alt", alt.trim());
     pending.forEach((item) => form.append("files", item.file));
@@ -1324,6 +1340,7 @@ function ProductMedia({
     setError("");
     const form = new FormData();
     form.append("productId", String(productId));
+    if (variantId) form.append("variantId", String(variantId));
     form.append("replaceImageId", String(image.id));
     form.append("file", file);
     try {
@@ -1372,9 +1389,11 @@ function ProductMedia({
       <div className="jp-admin__modal">
         <div className="jp-admin__modal-head">
           <div>
-            <p className="jp-admin__eyebrow">Product #{productId}</p>
+            <p className="jp-admin__eyebrow">
+              {variantId ? `Variant #${variantId}` : `Product #${productId}`}
+            </p>
             <h2 className="jp-admin__modal-title" id="jp-media-title">
-              {productName || "Product"} media
+              {productName || "Product"} {variantId ? "variant" : ""} media
             </h2>
           </div>
           <button className="jp-admin__close" type="button" onClick={onClose} aria-label="Close media" title="Close media">
@@ -1443,14 +1462,16 @@ function ProductMedia({
                 placeholder={productName}
               />
             </div>
-            <label className="jp-admin__check">
-              <input
-                type="checkbox"
-                checked={makePrimary}
-                onChange={(event) => setMakePrimary(event.target.checked)}
-              />
-              Make the first image primary
-            </label>
+            {variantId ? null : (
+              <label className="jp-admin__check">
+                <input
+                  type="checkbox"
+                  checked={makePrimary}
+                  onChange={(event) => setMakePrimary(event.target.checked)}
+                />
+                Make the first image primary
+              </label>
+            )}
             <button
               className="jp-admin__btn"
               type="button"
@@ -1481,7 +1502,7 @@ function ProductMedia({
                     {image.fileId ? ` · ${String(image.fileId).slice(0, 8)}…` : ""}
                   </p>
                   <div className="jp-admin__actions">
-                    {!image.isPrimary ? (
+                    {!variantId && !image.isPrimary ? (
                       <button
                         className="jp-admin__btn jp-admin__btn--ghost jp-admin__btn--small jp-admin__icon-btn jp-admin__icon-btn--primary"
                         type="button"
@@ -1569,13 +1590,18 @@ export default function AdminClient() {
   const [form, setForm] = useState<Record<string, any>>({});
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [mediaProduct, setMediaProduct] = useState<{ id: number; name: string } | null>(null);
+  const [mediaProduct, setMediaProduct] = useState<{
+    id: number;
+    name: string;
+    variantId?: number;
+  } | null>(null);
   const [toast, setToast] = useState("");
   const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sectionRef = useRef<SectionKey>("dashboard");
   const modalRef = useRef(false);
   const mainRef = useRef<HTMLDivElement | null>(null);
+  const pendingFiltersRef = useRef<Record<string, string> | null>(null);
 
   const resource = section === "dashboard" ? null : ADMIN_RESOURCES[section];
   const columns = useMemo(() => (resource ? tableColumns(resource) : []), [resource]);
@@ -1664,7 +1690,8 @@ export default function AdminClient() {
     setSort(activeResource.defaultSort.column);
     setOrder(activeResource.defaultSort.ascending ? "asc" : "desc");
     setQ("");
-    setFilters({});
+    setFilters(pendingFiltersRef.current ?? {});
+    pendingFiltersRef.current = null;
     setPage(1);
     setRecords([]);
   }, [section]);
@@ -2331,6 +2358,21 @@ export default function AdminClient() {
                     }}
                   />
                 </label>
+                {resource.key === "product-variants" ? (
+                  <input
+                    className="jp-admin__input"
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    aria-label="Filter by product ID"
+                    placeholder="Product ID"
+                    value={filters.product_id ?? ""}
+                    onChange={(event) => {
+                      setFilters((current) => ({ ...current, product_id: event.target.value }));
+                      setPage(1);
+                    }}
+                  />
+                ) : null}
                 {resource.fields
                   .filter((field) =>
                     ["status", "is_active", "role", "payment_status", "fulfillment_status", "placement", "category"].includes(
@@ -2409,14 +2451,49 @@ export default function AdminClient() {
                                 <AdminIcon name="edit" size={15} />
                               </button>
                               {resource.key === "products" ? (
+                                <>
+                                  <button
+                                    className="jp-admin__btn jp-admin__btn--ghost jp-admin__btn--small jp-admin__icon-btn"
+                                    type="button"
+                                    aria-label="Manage product variants"
+                                    data-tooltip="Variants"
+                                    title="Variants"
+                                    onClick={() => {
+                                      pendingFiltersRef.current = {
+                                        product_id: String(row.id),
+                                      };
+                                      selectSection("product-variants");
+                                    }}
+                                  >
+                                    <AdminIcon name="layers" size={15} />
+                                  </button>
+                                  <button
+                                    className="jp-admin__btn jp-admin__btn--ghost jp-admin__btn--small jp-admin__icon-btn"
+                                    type="button"
+                                    aria-label="Manage product media"
+                                    data-tooltip="Media"
+                                    title="Media"
+                                    onClick={() =>
+                                      setMediaProduct({ id: Number(row.id), name: text(row.name) })
+                                    }
+                                  >
+                                    <AdminIcon name="image" size={15} />
+                                  </button>
+                                </>
+                              ) : null}
+                              {resource.key === "product-variants" ? (
                                 <button
                                   className="jp-admin__btn jp-admin__btn--ghost jp-admin__btn--small jp-admin__icon-btn"
                                   type="button"
-                                  aria-label="Manage product media"
-                                  data-tooltip="Media"
-                                  title="Media"
+                                  aria-label="Manage variant images"
+                                  data-tooltip="Variant images"
+                                  title="Variant images"
                                   onClick={() =>
-                                    setMediaProduct({ id: Number(row.id), name: text(row.name) })
+                                    setMediaProduct({
+                                      id: Number(row.product_id),
+                                      name: `${text(row.color || row.shape || "Variant")} ${text(row.sku || "")}`.trim(),
+                                      variantId: Number(row.id),
+                                    })
                                   }
                                 >
                                   <AdminIcon name="image" size={15} />
@@ -2505,6 +2582,32 @@ export default function AdminClient() {
               ))}
             </div>
 
+            {resource.key === "orders" && Array.isArray(modal.record?.order_items) ? (
+              <section className="jp-admin__order-items" aria-labelledby="jp-order-items-title">
+                <h3 className="jp-admin__section-title" id="jp-order-items-title">
+                  Order items & requirements
+                </h3>
+                <div className="jp-admin__order-items-list">
+                  {modal.record.order_items.map((item: AdminRecord) => (
+                    <article className="jp-admin__order-item" key={text(item.id) || `${text(item.product_id)}-${text(item.name)}`}>
+                      <div>
+                        <strong>{text(item.name) || "Product"}</strong>
+                        <span>
+                          {Number(item.quantity || 0)} × {money(item.unit_price, text(modal.record?.currency) || "USD")}
+                        </span>
+                      </div>
+                      {item.customer_requirements ? (
+                        <p>
+                          <span>Customer requirements</span>
+                          {text(item.customer_requirements)}
+                        </p>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             {formError ? <p className="jp-admin__error">{formError}</p> : null}
             <div className="jp-admin__modal-actions">
               <button className="jp-admin__btn jp-admin__btn--ghost" type="button" onClick={() => setModal(null)}>
@@ -2522,6 +2625,7 @@ export default function AdminClient() {
         <ProductMedia
           productId={mediaProduct.id}
           productName={mediaProduct.name}
+          variantId={mediaProduct.variantId}
           onClose={() => setMediaProduct(null)}
         />
       ) : null}

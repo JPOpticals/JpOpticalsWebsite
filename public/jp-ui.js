@@ -35,6 +35,7 @@
     String(value ?? "").trim().replace(/^Eyeglasses$/i, "Optical");
 
   const transitionsLabel = "Transitions (Photochromic)";
+  let activeProductVariant = null;
 
   const transitionsHref = (href) => {
     const [pathname, query = ""] = String(href || "/shop").split("?");
@@ -98,6 +99,21 @@
     }
     return payload;
   };
+
+  const withTimeout = (promise, milliseconds, message) =>
+    new Promise((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error(message)), milliseconds);
+      Promise.resolve(promise).then(
+        (value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          window.clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
 
   let contentPromise = null;
   const loadContent = () => {
@@ -296,6 +312,8 @@
   let activeOverlay = null;
   let previousFocus = null;
   let searchTimer = null;
+  let pdpOverlay = null;
+  let pdpModalCleanup = null;
 
   const lockPage = () => {
     document.documentElement.classList.add("jp-lock");
@@ -303,7 +321,12 @@
   };
 
   const unlockPage = () => {
-    if (accountOverlay.hidden && searchOverlay.hidden && menuOverlay.hidden) {
+    if (
+      accountOverlay.hidden &&
+      searchOverlay.hidden &&
+      menuOverlay.hidden &&
+      (!pdpOverlay || pdpOverlay.hidden)
+    ) {
       document.documentElement.classList.remove("jp-lock");
       document.body.classList.remove("jp-lock");
     }
@@ -318,6 +341,10 @@
 
   const closeOverlay = (overlay) => {
     overlay.hidden = true;
+    if (overlay === pdpOverlay) {
+      pdpModalCleanup?.();
+      pdpModalCleanup = null;
+    }
     if (overlay === searchOverlay && searchButton) {
       searchButton.setAttribute("aria-expanded", "false");
     }
@@ -431,22 +458,28 @@
 
   const loadIndex = () => {
     if (!indexPromise) {
-      indexPromise = apiRequest("/api/catalog")
+      indexPromise = withTimeout(
+        apiRequest("/api/catalog", { cache: "no-store" }),
+        2200,
+        "Catalog request timed out",
+      )
         .then((data) => {
           if (!Array.isArray(data.products)) throw new Error("Catalog unavailable");
           searchIndex = data;
           return data;
         })
         .catch(() =>
-          fetch("/search-index.json")
-            .then((response) => {
+          withTimeout(
+            fetch("/search-index.json", { cache: "no-store" }).then((response) => {
               if (!response.ok) throw new Error("Search index unavailable");
               return response.json();
-            })
-            .then((data) => {
-              searchIndex = data;
-              return data;
             }),
+            1200,
+            "Search index request timed out",
+          ).then((data) => {
+            searchIndex = data;
+            return data;
+          }),
         )
         .catch(() => {
           searchIndex = { products: [], collections: [] };
@@ -1152,26 +1185,62 @@
         event.preventDefault();
         event.stopPropagation();
         const isDetailButton = button.textContent.trim().toLowerCase() === "add to cart";
+        const variant = isDetailButton ? activeProductVariant : null;
+        if (variant && Number.isInteger(Number(variant.stock)) && Number(variant.stock) <= 0) {
+          showToast("That colourway is currently out of stock.");
+          return;
+        }
         const name = isDetailButton
           ? document.querySelector("main h1")?.textContent.trim() || "Item"
           : button.getAttribute("aria-label")?.replace(/^Add | to bag$/g, "") || "Item";
         const link = button.closest("a[href]");
-        const url = link?.getAttribute("href") || `${window.location.pathname}${window.location.search}` || "/shop";
-        const image = link?.querySelector("img")?.getAttribute("src") || document.querySelector("main img[alt]")?.getAttribute("src") || "";
-        const price = link?.querySelector("p:last-child span")?.textContent.trim() || document.querySelector('main span[class*="text-[19px]"]')?.textContent.trim() || "";
+        let url = link?.getAttribute("href") || `${window.location.pathname}${window.location.search}` || "/shop";
+        if (variant?.id) {
+          const parsed = new URL(url, window.location.origin);
+          parsed.searchParams.set("variant_id", String(variant.id));
+          url = parsed.pathname + (parsed.search ? parsed.search : "");
+        }
+        const image =
+          variant?.image ||
+          link?.querySelector("img")?.getAttribute("src") ||
+          document.querySelector("main img[alt]")?.getAttribute("src") ||
+          "";
+        const price =
+          variant?.price ||
+          link?.querySelector("p:last-child span")?.textContent.trim() ||
+          document.querySelector('main span[class*="text-[19px]"]')?.textContent.trim() ||
+          "";
+        const variantLabel = variant ? variantSummary(variant) : "";
+        const requirements = isDetailButton
+          ? String(document.querySelector("[data-jp-pdp-requirements]")?.value || "")
+              .trim()
+              .slice(0, 1000)
+          : "";
         const cart = readCart();
-        const existing = cart.find((item) => item.name === name && item.url === url);
+        const existing = cart.find(
+          (item) =>
+            item.name === name &&
+            item.url === url &&
+            Number(item.variantId || 0) === Number(variant?.id || 0) &&
+            String(item.requirements || "") === requirements,
+        );
         if (existing) existing.quantity += 1;
-        else cart.push({
-          name,
-          url,
-          quantity: 1,
-          image,
-          price,
-        });
+        else
+          cart.push({
+            name,
+            url,
+            quantity: 1,
+            image,
+            price,
+            ...(variant?.id ? { variantId: variant.id, sku: variant.sku || "" } : {}),
+            ...(variantLabel ? { variantLabel } : {}),
+            ...(requirements ? { requirements } : {}),
+          });
         writeCart(cart);
         updateCartBadge();
-        showToast(`${name} added to your bag`);
+        showToast(
+          variantLabel ? `${name} — ${variantLabel} added to your bag` : `${name} added to your bag`,
+        );
       });
     });
     updateCartBadge();
@@ -1250,9 +1319,14 @@
               const customization = item.customizer && typeof item.customizer === "object" ? item.customizer : null;
               const meta = customization
                 ? `${customization.frameName || "Selected frame"} · ${customization.lensName || "Selected lens"}`
-                : "COLOR / STANDARD";
+                : item.variantLabel || "COLOR / STANDARD";
               const customizationDetails = customization
-                ? `<div class="jp-cart-customization"><span>Frame</span><strong>${escapeHtml(customization.frameName || "Selected frame")}</strong><span>Lens</span><strong>${escapeHtml(customization.lensName || "Selected lens")}</strong></div>`
+                ? `<div class="jp-cart-customization"><span>Frame</span><strong>${escapeHtml(customization.frameName || "Selected frame")}</strong><span>Lens</span><strong>${escapeHtml(customization.lensName || "Selected lens")}</strong>${item.requirements ? `<span>Requirements</span><strong class="jp-cart-requirements">${escapeHtml(item.requirements)}</strong>` : ""}</div>`
+                : item.variantLabel || item.sku
+                  ? `<div class="jp-cart-customization">${item.variantLabel ? `<span>Variant</span><strong>${escapeHtml(item.variantLabel)}</strong>` : ""}${item.sku ? `<span>SKU</span><strong>${escapeHtml(item.sku)}</strong>` : ""}${item.requirements ? `<span>Requirements</span><strong class="jp-cart-requirements">${escapeHtml(item.requirements)}</strong>` : ""}</div>`
+                  : "";
+              const requirementsDetails = !customization && item.requirements && !item.variantLabel && !item.sku
+                ? `<div class="jp-cart-customization"><span>Requirements</span><strong class="jp-cart-requirements">${escapeHtml(item.requirements)}</strong></div>`
                 : "";
               return `<article class="jp-cart-item${customization ? " jp-cart-item--customized" : ""}" data-jp-cart-index="${index}">
               <a class="jp-cart-image" href="${escapeHtml(item.url)}">${customizerCartPreview(item)}</a>
@@ -1260,6 +1334,7 @@
                 <a class="jp-cart-name" href="${escapeHtml(item.url)}">${escapeHtml(item.name)}</a>
                 <p class="jp-cart-meta">${escapeHtml(meta)}</p>
                 ${customizationDetails}
+                ${requirementsDetails}
                 <div class="jp-cart-controls">
                   <div class="jp-cart-quantity" aria-label="Quantity for ${escapeHtml(item.name)}">
                     <button type="button" data-jp-cart-decrease aria-label="Decrease quantity">−</button>
@@ -1311,12 +1386,14 @@
               ? {
                   productId: Number(match[1]),
                   quantity: Math.max(1, Number(item.quantity) || 1),
+                  ...(Number(item.variantId) > 0 ? { variantId: Number(item.variantId) } : {}),
                   ...(customizerUuid(customization?.frameId) && customizerUuid(customization?.lensId)
                     ? {
                         customizerFrameId: customization.frameId,
                         customizerLensId: customization.lensId,
                       }
                     : {}),
+                  ...(item.requirements ? { requirements: String(item.requirements).slice(0, 1000) } : {}),
                 }
               : null;
           })
@@ -2037,14 +2114,88 @@
     });
   };
 
-  const shopCategoryState = () => {
+  const SHOP_PAGE_SIZE = 20;
+
+  const shopPageState = () => {
     const params = new URLSearchParams(window.location.search);
     const type = (params.get("type_frame") || "").toLowerCase();
     const lens = (params.get("lens") || "").toLowerCase();
+    const gender = (params.get("gender") || "").toLowerCase();
+    const page = Math.max(1, Number.parseInt(params.get("page") || "1", 10) || 1);
     return {
       type: type === "sunglasses" ? "Sunglasses" : type === "optical" ? "Optical" : "",
       transitions: lens === "transitions",
+      gender,
+      page,
     };
+  };
+
+  const shopProductOrder = (products) =>
+    products
+      .map((product, index) => {
+        const raw = product?.sortOrder;
+        const sortOrder =
+          raw !== null && raw !== undefined && Number.isFinite(Number(raw))
+            ? Number(raw)
+            : index;
+        return { product, index, sortOrder };
+      })
+      .sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.product);
+
+  const shopHref = (targetPage) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("page", String(targetPage));
+    return `/shop?${params.toString()}`;
+  };
+
+  const shopPaginationMarkup = (page, totalPages) => {
+    const baseClass =
+      "flex h-9 w-9 items-center justify-center text-neutral-500 transition-colors duration-300 hover:text-black no-underline";
+    const disabledClass = `${baseClass} pointer-events-none opacity-30`;
+    const chevronLeft =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="m15 18-6-6 6-6"></path></svg>';
+    const chevronRight =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="m9 18 6-6-6-6"></path></svg>';
+    const prev =
+      page > 1
+        ? `<a class="${baseClass}" aria-label="Previous page" href="${escapeHtml(shopHref(page - 1))}">${chevronLeft}</a>`
+        : `<button disabled aria-label="Previous page" class="${disabledClass}">${chevronLeft}</button>`;
+    const pages = new Set([1, totalPages, page - 1, page, page + 1]);
+    const ordered = [...pages]
+      .filter((number) => number >= 1 && number <= totalPages)
+      .sort((a, b) => a - b);
+    let last = 0;
+    const numbers = ordered
+      .map((number) => {
+        const gap = number - last > 1 && last > 0;
+        last = number;
+        const ellipsis = gap
+          ? '<span class="px-1 text-[13px] text-neutral-400">…</span>'
+          : "";
+        const className =
+          number === page
+            ? "h-9 min-w-9 px-2 text-[13px] border-b border-black text-black no-underline"
+            : "h-9 min-w-9 px-2 text-[13px] transition-colors duration-300 text-neutral-500 hover:text-black no-underline";
+        const current = number === page ? ' aria-current="page"' : "";
+        return `${ellipsis}<a class="${className}"${current} href="${escapeHtml(shopHref(number))}">${number}</a>`;
+      })
+      .join("");
+    const next =
+      page < totalPages
+        ? `<a class="${baseClass}" aria-label="Next page" href="${escapeHtml(shopHref(page + 1))}">${chevronRight}</a>`
+        : `<button disabled aria-label="Next page" class="${disabledClass}">${chevronRight}</button>`;
+    return `${prev}${numbers}${next}`;
+  };
+
+  const renderShopPagination = (page, totalPages) => {
+    const grid = document.querySelector("main > .grid");
+    const nav = grid?.parentElement?.querySelector(":scope > nav.mt-16");
+    if (!nav) return;
+    nav.innerHTML = shopPaginationMarkup(page, totalPages);
   };
 
   const renderShopSubnav = (activeType, transitions) => {
@@ -2090,23 +2241,52 @@
     const grid = document.querySelector("main > .grid");
     if (!grid || grid.dataset.jpCatalogBound) return;
     grid.dataset.jpCatalogBound = "true";
-    const { type: activeType, transitions } = shopCategoryState();
+    const { type: activeType, transitions, gender, page: requestedPage } = shopPageState();
     grid.classList.toggle("jp-transitions-grid", transitions);
     renderShopSubnav(activeType, transitions);
+    if (grid.dataset.jpShopSsr === "true") return;
     loadIndex()
       .then((data) => {
         const allProducts = Array.isArray(data.products) ? data.products : [];
-        const products = allProducts.filter((product) => {
-          if (activeType && product.type !== activeType) return false;
-          if (transitions && !productHasTransitions(product)) return false;
-          return true;
-        });
-        if (!products.length) throw new Error("Catalog is empty");
+        const genderAvailable = allProducts.some((product) =>
+          String(product.gender || "").trim(),
+        );
+        const wantedGenders =
+          gender === "male"
+            ? ["male", "unisex"]
+            : gender === "female"
+              ? ["female", "unisex"]
+              : gender
+                ? [gender]
+                : [];
+        const products = shopProductOrder(
+          allProducts.filter((product) => {
+            if (activeType && product.type !== activeType) return false;
+            if (transitions && !productHasTransitions(product)) return false;
+            if (
+              genderAvailable &&
+              wantedGenders.length &&
+              !wantedGenders.includes(String(product.gender || "").toLowerCase())
+            ) {
+              return false;
+            }
+            return true;
+          }),
+        );
+        const totalPages = Math.max(1, Math.ceil(products.length / SHOP_PAGE_SIZE));
+        const page = Math.min(requestedPage, totalPages);
+        const visible = products.slice(
+          (page - 1) * SHOP_PAGE_SIZE,
+          page * SHOP_PAGE_SIZE,
+        );
         const count = Array.from(document.querySelectorAll(".sticky p")).find((item) =>
           /products?$/i.test(item.textContent.trim()),
         );
         if (count) count.textContent = `${products.length} products`;
-        grid.innerHTML = products.map(productCardMarkup).join("");
+        grid.innerHTML = visible.length
+          ? visible.map(productCardMarkup).join("")
+          : '<p class="col-span-full py-16 text-center font-nav text-[13px] uppercase tracking-[0.12em] text-neutral-500">No products found</p>';
+        renderShopPagination(page, totalPages);
         setupProductActions();
         grid.dispatchEvent(new Event("jp-catalog-rendered"));
       })
@@ -2559,6 +2739,1113 @@
       .catch(() => {});
   };
 
+  const variantMoney = (value, currency = "USD") => {
+    const amount = Number(value ?? 0);
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number.isFinite(amount) ? amount : 0);
+    } catch {
+      return `$${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+    }
+  };
+
+  const variantSummary = (variant) =>
+    [variant?.color, variant?.shape, variant?.design, variant?.size]
+      .filter(Boolean)
+      .join(" · ");
+
+  const splitVariantShape = (value) => {
+    const raw = String(value ?? "").trim();
+    const match = raw.match(/^(.*?)\s+(Full Frame|Half Rimless|Rimless)$/i);
+    if (match) return { shape: match[1].trim(), design: match[2] };
+    if (/^rimless$/i.test(raw)) return { shape: "Rimless", design: "Rimless" };
+    return { shape: raw, design: "Full Frame" };
+  };
+
+  const SWATCH_COLORS = {
+    black: "#111111",
+    brown: "#6b4a32",
+    gold: "#c7a35b",
+    silver: "#c9ccd0",
+    havana: "#8d5a33",
+    transparent: "#e9e4dc",
+    blue: "#2d5d8a",
+    "vivid blue": "#1d4ed8",
+    "sky blue": "#7db8dd",
+    purple: "#6a4c93",
+    violet: "#7c5cbf",
+    "cotton candy": "#eab8cd",
+    "grey-light": "#b9b9b4",
+    gunmetal: "#4b4f55",
+    "light brown": "#b08a63",
+    green: "#3f6b4b",
+    ivory: "#eee7d7",
+    "rose gold": "#c98d72",
+    burgundy: "#6d2434",
+    magneta: "#c03a80",
+    magenta: "#c03a80",
+    yellow: "#d8b63d",
+    pink: "#dfa0b1",
+    grey: "#8a8d90",
+    "light-blue": "#9ec9e2",
+    "champagne gold": "#d8c49b",
+    "white gold": "#ded6c3",
+    "yellow gold": "#d4af37",
+    white: "#f7f5f1",
+    clear: "#e8eef1",
+  };
+
+  const swatchColor = (variant) => {
+    const code = String(variant?.colorCode || "").trim();
+    if (/^(#|rgb|hsl)/i.test(code)) return code;
+    const key = normalize(variant?.color || "");
+    return SWATCH_COLORS[key] || "#d8d3cc";
+  };
+
+  const PDP_ARROW_LEFT =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
+  const PDP_ARROW_RIGHT =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>';
+
+  const pdpSpecValue = (main, label) => {
+    const span = Array.from(main.querySelectorAll("span.text-neutral-500")).find(
+      (node) => node.textContent.trim() === label,
+    );
+    return span?.nextElementSibling?.textContent.trim() || "";
+  };
+
+  const PDP_DETAIL_ICONS = {
+    story:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"></path><path d="M4 5.5v16"></path><path d="M8 7h8M8 11h7"></path></svg>',
+    materials:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"></path><path d="m3 13 9 5 9-5"></path><path d="m3 17 9 5 9-5"></path></svg>',
+    specs:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path></svg>',
+    shipping:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v11H3z"></path><path d="M14 10h3l4 4v3h-7z"></path><circle cx="7" cy="19" r="1.5"></circle><circle cx="18" cy="19" r="1.5"></circle></svg>',
+    warranty:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.3 8.2-8 10-4.7-1.8-8-5-8-10V6z"></path><path d="m8.5 12 2.2 2.2 4.8-5"></path></svg>',
+  };
+
+  const pdpDetailRows = (product, variant) => {
+    const selected = variant || {};
+    return [
+      ["Brand", product.brand],
+      ["Model", product.model],
+      ["Frame type", product.type],
+      ["Gender", product.gender],
+      ["Shape", selected.shape || product.shape],
+      ["Design", selected.design],
+      ["Material", product.material],
+      ["Size", selected.size || product.size],
+      ["Color code", selected.colorCode || product.colorCode],
+      ["SKU", selected.sku],
+    ].filter(([, value]) => value);
+  };
+
+  const setupPdpAccordions = (host) => {
+    if (!host) return;
+    host.querySelectorAll("[data-jp-pdp-detail]").forEach((button, index) => {
+      const answer = button.nextElementSibling;
+      if (!answer || button.dataset.jpBound) return;
+      button.dataset.jpBound = "true";
+      button.type = "button";
+      button.setAttribute("aria-expanded", index === 0 ? "true" : "false");
+      answer.hidden = index !== 0;
+      answer.style.maxHeight = index === 0 ? `${answer.scrollHeight}px` : "0px";
+      button.addEventListener("click", () => {
+        const expanded = button.getAttribute("aria-expanded") === "true";
+        button.setAttribute("aria-expanded", expanded ? "false" : "true");
+        if (expanded) {
+          answer.style.maxHeight = "0px";
+          window.setTimeout(() => {
+            if (button.getAttribute("aria-expanded") === "false") answer.hidden = true;
+          }, 280);
+          return;
+        }
+        answer.hidden = false;
+        answer.style.maxHeight = `${answer.scrollHeight}px`;
+      });
+    });
+  };
+
+  const renderPdpDetails = (host, product, variant, delivery) => {
+    if (!host || !product) return;
+    const selected = variant || {};
+    const description = product.description || product.shortDescription || "";
+    const standardLabel = delivery?.standardLabel || "Standard shipping";
+    const standardDays =
+      delivery?.standardDaysMin && delivery?.standardDaysMax
+        ? `${delivery.standardDaysMin}–${delivery.standardDaysMax} business days`
+        : "Delivery timing is confirmed at checkout";
+    const shipsTo = Array.isArray(delivery?.shipsTo) && delivery.shipsTo.length
+      ? `Ships to ${delivery.shipsTo.join(", ")}`
+      : "Shipping availability is confirmed at checkout";
+    const returnsNote =
+      delivery?.returnsNote || "Review the JP returns policy before ordering.";
+    const rows = pdpDetailRows(product, selected);
+    const detail = (key, title, icon, body, open = false) => `<div class="jp-pdp-detail${open ? " is-open" : ""}">
+      <button class="jp-pdp-detail__trigger" type="button" data-jp-pdp-detail aria-expanded="${open ? "true" : "false"}" aria-controls="jp-pdp-detail-${key}">
+        <span class="jp-pdp-detail__title"><span class="jp-pdp-detail__icon">${icon}</span>${title}</span>
+        <span class="jp-pdp-detail__plus" aria-hidden="true"></span>
+      </button>
+      <div class="jp-pdp-detail__body" id="jp-pdp-detail-${key}">${body}</div>
+    </div>`;
+
+    host.classList.add("jp-pdp-details");
+    host.innerHTML = [
+      detail(
+        "story",
+        "The frame",
+        PDP_DETAIL_ICONS.story,
+        `<p class="jp-pdp-detail__copy">${escapeHtml(description || "A considered frame from the JP catalog.")}</p>`,
+        true,
+      ),
+      detail(
+        "materials",
+        "Materials & care",
+        PDP_DETAIL_ICONS.materials,
+        `<p class="jp-pdp-detail__copy">${escapeHtml(product.material || "Material details are listed with the frame specifications.")}</p>
+         <p class="jp-pdp-detail__note">Keep the frame in its case when not in use and clean it with a soft, dry cloth.</p>`,
+      ),
+      detail(
+        "specifications",
+        "Specifications",
+        PDP_DETAIL_ICONS.specs,
+        `<dl class="jp-pdp-detail__specs">${rows
+          .map(
+            ([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd data-jp-pdp-value="${escapeHtml(label.toLowerCase().replace(/\s+/g, "-"))}">${escapeHtml(value)}</dd></div>`,
+          )
+          .join("")}</dl>`,
+      ),
+      detail(
+        "shipping",
+        "Shipping & returns",
+        PDP_DETAIL_ICONS.shipping,
+        `<p class="jp-pdp-detail__copy" data-jp-pdp-shipping-copy><strong>${escapeHtml(standardLabel)}</strong><br>${escapeHtml(standardDays)}<br>${escapeHtml(shipsTo)}</p>
+         <p class="jp-pdp-detail__note" data-jp-pdp-returns-note>${escapeHtml(returnsNote)}</p>
+         <a class="jp-pdp-detail__link" href="/shipping-policy">View shipping policy</a>`,
+      ),
+      detail(
+        "warranty",
+        "Warranty",
+        PDP_DETAIL_ICONS.warranty,
+        `<p class="jp-pdp-detail__copy">Warranty coverage follows the maker's terms for this frame. Keep your order details for support.</p>
+         <a class="jp-pdp-detail__link" href="/contact-us">Contact JP support</a>`,
+      ),
+    ].join("");
+    setupPdpAccordions(host);
+  };
+
+  const updatePdpDeliveryDetails = (host, delivery) => {
+    if (!host || !delivery) return;
+    const standardLabel = delivery.standardLabel || "Standard shipping";
+    const standardDays =
+      delivery.standardDaysMin && delivery.standardDaysMax
+        ? `${delivery.standardDaysMin}â€“${delivery.standardDaysMax} business days`
+        : "Delivery timing is confirmed at checkout";
+    const shipsTo = Array.isArray(delivery.shipsTo) && delivery.shipsTo.length
+      ? `Ships to ${delivery.shipsTo.join(", ")}`
+      : "Shipping availability is confirmed at checkout";
+    const shippingCopy = host.querySelector("[data-jp-pdp-shipping-copy]");
+    if (shippingCopy) {
+      shippingCopy.innerHTML = `<strong>${escapeHtml(standardLabel)}</strong><br>${escapeHtml(standardDays)}<br>${escapeHtml(shipsTo)}`;
+    }
+    const returnsNote = host.querySelector("[data-jp-pdp-returns-note]");
+    if (returnsNote) returnsNote.textContent = delivery.returnsNote || "Review the JP returns policy before ordering.";
+  };
+
+  const updatePdpDetails = (host, product, variant) => {
+    if (!host || !product) return;
+    const selected = variant || {};
+    const values = {
+      brand: product.brand,
+      model: product.model,
+      "frame-type": product.type,
+      gender: product.gender,
+      shape: selected.shape || product.shape,
+      design: selected.design,
+      material: product.material,
+      size: selected.size || product.size,
+      "color-code": selected.colorCode || product.colorCode,
+      sku: selected.sku,
+    };
+    Object.entries(values).forEach(([key, value]) => {
+      const node = host.querySelector(`[data-jp-pdp-value="${key}"]`);
+      if (node && value) node.textContent = String(value);
+    });
+  };
+
+  const ensurePdpOverlay = () => {
+    if (pdpOverlay) return pdpOverlay;
+    pdpOverlay = document.createElement("div");
+    pdpOverlay.className = "jp-overlay jp-pdp-overlay";
+    pdpOverlay.dataset.jpPdpModal = "true";
+    pdpOverlay.hidden = true;
+    pdpOverlay.innerHTML = `<div class="jp-modal jp-pdp-modal" role="dialog" aria-modal="true" aria-labelledby="jp-pdp-modal-title">
+      <div class="jp-modal-head">
+        <h2 class="jp-modal-title" id="jp-pdp-modal-title"></h2>
+        <button class="jp-close" type="button" data-jp-close aria-label="Close window">${ICONS.close}</button>
+      </div>
+      <div class="jp-modal-body" data-jp-pdp-modal-body></div>
+    </div>`;
+    document.body.appendChild(pdpOverlay);
+    pdpOverlay.querySelectorAll("[data-jp-close]").forEach((button) => {
+      button.addEventListener("click", () => closeOverlay(pdpOverlay));
+    });
+    pdpOverlay.addEventListener("mousedown", (event) => {
+      if (event.target === pdpOverlay) closeOverlay(pdpOverlay);
+    });
+    return pdpOverlay;
+  };
+
+  const openPdpModal = (title, body) => {
+    const overlay = ensurePdpOverlay();
+    pdpModalCleanup?.();
+    pdpModalCleanup = null;
+    overlay.querySelector(".jp-modal-title").textContent = title;
+    overlay.querySelector("[data-jp-pdp-modal-body]").innerHTML = body;
+    openOverlay(overlay);
+    window.setTimeout(() => {
+      overlay.querySelector("[data-jp-close]")?.focus({ preventScroll: true });
+    }, 40);
+    return overlay;
+  };
+
+  const openPdpSizeChart = (main, productName) => {
+    const size = pdpSpecValue(main, "Size");
+    const current = size.trim().toUpperCase();
+    const rows = [
+      ["XS", "Extra small", "44–47 mm"],
+      ["S", "Small", "48–50 mm"],
+      ["M", "Medium", "51–53 mm"],
+      ["L", "Large", "54–57 mm"],
+    ];
+    const body = `<div class="jp-pdp-size-guide">
+      <p class="jp-pdp-sheet-lead">${escapeHtml(productName)} is a <strong>${escapeHtml(size || "standard")}</strong> fit. Compare typical lens widths below before choosing your frame.</p>
+      <table class="jp-pdp-size-table">
+        <thead><tr><th scope="col">Size</th><th scope="col">Fit</th><th scope="col">Typical lens width</th></tr></thead>
+        <tbody>${rows
+          .map(
+            ([code, fit, width]) =>
+              `<tr${code === current ? ' class="is-current"' : ""}><th scope="row">${code}</th><td>${fit}</td><td>${width}</td></tr>`,
+          )
+          .join("")}</tbody>
+      </table>
+      <p class="jp-pdp-sheet-note">Fit varies with frame shape and bridge width. Our opticians can confirm the exact measurements for this frame before dispatch.</p>
+      <a class="jp-pdp-sheet-link" href="/contact-us">Talk to an optician</a>
+    </div>`;
+    openPdpModal("Size guide", body);
+  };
+
+  const openPdpTryOn = (imageUrl, alt) => {
+    if (!imageUrl) return;
+    const overlay = openPdpModal(
+      "Try on",
+      `<div class="jp-tryon" data-jp-tryon>
+        <div class="jp-tryon-stage" data-jp-tryon-stage>
+          <video class="jp-tryon-video" playsinline muted hidden></video>
+          <img class="jp-tryon-photo" alt="" hidden>
+          <img class="jp-tryon-frame" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt || "Eyewear preview")}">
+          <span class="jp-tryon-hint">Drag the frame to position it over your eyes.</span>
+        </div>
+        <div class="jp-tryon-controls">
+          <label class="jp-tryon-range"><span>Frame size</span><input type="range" min="30" max="110" value="68" data-jp-tryon-size></label>
+          <div class="jp-tryon-actions">
+            <button type="button" data-jp-tryon-camera>Use camera</button>
+            <label class="jp-tryon-upload">Upload photo<input type="file" accept="image/*" data-jp-tryon-upload></label>
+            <button type="button" data-jp-tryon-reset>Reset</button>
+          </div>
+          <p class="jp-tryon-status" aria-live="polite">Allow camera access or upload a portrait to preview this frame.</p>
+        </div>
+      </div>`,
+    );
+
+    const stage = overlay.querySelector("[data-jp-tryon-stage]");
+    const video = overlay.querySelector(".jp-tryon-video");
+    const photo = overlay.querySelector(".jp-tryon-photo");
+    const frame = overlay.querySelector(".jp-tryon-frame");
+    const size = overlay.querySelector("[data-jp-tryon-size]");
+    const status = overlay.querySelector(".jp-tryon-status");
+    const cameraButton = overlay.querySelector("[data-jp-tryon-camera]");
+    const upload = overlay.querySelector("[data-jp-tryon-upload]");
+    const resetButton = overlay.querySelector("[data-jp-tryon-reset]");
+    let stream = null;
+    let drag = null;
+
+    const stopStream = () => {
+      stream?.getTracks?.().forEach((track) => track.stop());
+      stream = null;
+      video.srcObject = null;
+      video.hidden = true;
+      stage.classList.remove("has-video");
+      if (cameraButton) cameraButton.textContent = "Use camera";
+    };
+    pdpModalCleanup = stopStream;
+
+    const setFramePosition = (left, top) => {
+      frame.style.left = `${left}%`;
+      frame.style.top = `${top}%`;
+      frame.style.transform = "translate(-50%, -50%)";
+    };
+
+    size?.addEventListener("input", () => {
+      frame.style.width = `${size.value}%`;
+    });
+    frame.style.width = `${size?.value || 68}%`;
+    setFramePosition(50, 44);
+
+    cameraButton?.addEventListener("click", async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if (status) status.textContent = "This browser does not support a live camera. Upload a portrait instead.";
+        return;
+      }
+      if (stream) {
+        stopStream();
+        if (status) status.textContent = "Camera stopped. Upload a portrait or start the camera again.";
+        return;
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 960 } },
+          audio: false,
+        });
+        video.srcObject = stream;
+        video.hidden = false;
+        photo.hidden = true;
+        stage.classList.add("has-video");
+        await video.play().catch(() => {});
+        if (cameraButton) cameraButton.textContent = "Stop camera";
+        if (status) status.textContent = "Camera ready. Drag and resize the frame to line it up.";
+      } catch {
+        if (status) status.textContent = "Camera access was not available. Upload a portrait instead.";
+      }
+    });
+
+    upload?.addEventListener("change", () => {
+      const file = upload.files?.[0];
+      if (!file) return;
+      stopStream();
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        photo.src = String(reader.result || "");
+        photo.hidden = false;
+        stage.classList.add("has-photo");
+        if (status) status.textContent = "Portrait ready. Drag and resize the frame to line it up.";
+      });
+      reader.readAsDataURL(file);
+    });
+
+    resetButton?.addEventListener("click", () => {
+      if (size) size.value = "68";
+      frame.style.width = "68%";
+      setFramePosition(50, 44);
+      if (status) status.textContent = "Frame position reset.";
+    });
+
+    stage?.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button, input, label")) return;
+      const stageRect = stage.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      drag = {
+        startX: event.clientX,
+        startY: event.clientY,
+        centerX: frameRect.left + frameRect.width / 2 - stageRect.left,
+        centerY: frameRect.top + frameRect.height / 2 - stageRect.top,
+        width: stageRect.width,
+        height: stageRect.height,
+      };
+      frame.setPointerCapture?.(event.pointerId);
+    });
+    stage?.addEventListener("pointermove", (event) => {
+      if (!drag) return;
+      const x = Math.max(0, Math.min(drag.width, drag.centerX + event.clientX - drag.startX));
+      const y = Math.max(0, Math.min(drag.height, drag.centerY + event.clientY - drag.startY));
+      frame.style.left = `${(x / drag.width) * 100}%`;
+      frame.style.top = `${(y / drag.height) * 100}%`;
+    });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((name) => {
+      stage?.addEventListener(name, () => {
+        drag = null;
+      });
+    });
+  };
+
+  const renderPdpGallery = (host, urls, alt) => {
+    if (!host) return;
+    const unique = [...new Set((urls || []).filter(Boolean))];
+    if (!unique.length) {
+      host.dataset.jpPdpCount = "0";
+      host.classList.add("is-empty");
+      host.innerHTML = '<div class="jp-pdp-gallery-empty" role="status">Product image unavailable</div>';
+      return;
+    }
+    host.classList.remove("is-empty");
+    host.dataset.jpPdpCount = String(unique.length);
+    host.classList.toggle("is-single", unique.length < 2);
+    host.innerHTML = `<div class="jp-pdp-thumbs" role="tablist" aria-label="Product images">
+      ${unique
+        .map(
+          (url, index) =>
+            `<button class="jp-pdp-thumb${index === 0 ? " is-active" : ""}" type="button" role="tab" aria-selected="${index === 0 ? "true" : "false"}" aria-label="View image ${index + 1}" data-jp-pdp-thumb="${index}"><img src="${escapeHtml(url)}" alt="" loading="lazy"></button>`,
+        )
+        .join("")}
+    </div>
+    <div class="jp-pdp-stage" data-jp-pdp-stage>
+      <div class="jp-pdp-slides">${unique
+        .map(
+          (url, index) =>
+            `<figure class="jp-pdp-slide${index === 0 ? " is-active" : ""}" data-jp-pdp-slide="${index}"><img src="${escapeHtml(url)}" alt="${escapeHtml(alt || "Product image")}" loading="${index === 0 ? "eager" : "lazy"}"></figure>`,
+        )
+        .join("")}</div>
+      <button class="jp-pdp-arrow jp-pdp-arrow--prev" type="button" aria-label="Previous image">${PDP_ARROW_LEFT}</button>
+      <button class="jp-pdp-arrow jp-pdp-arrow--next" type="button" aria-label="Next image">${PDP_ARROW_RIGHT}</button>
+      <button class="jp-pdp-tryon" type="button" data-jp-tryon>Try on</button>
+    </div>`;
+
+    const slides = host.querySelector(".jp-pdp-slides");
+    const thumbs = Array.from(host.querySelectorAll("[data-jp-pdp-thumb]"));
+    const stage = host.querySelector("[data-jp-pdp-stage]");
+    host.querySelectorAll("img").forEach((image) => {
+      image.addEventListener("error", () => {
+        if (image.dataset.jpFallback) return;
+        image.dataset.jpFallback = "true";
+        image.src = "/mirror-assets/placeholder.svg";
+      });
+    });
+    let index = 0;
+    let start = null;
+
+    const show = (next) => {
+      index = (next + unique.length) % unique.length;
+      if (slides) slides.style.transform = `translateX(-${index * 100}%)`;
+      host.dataset.jpPdpIndex = String(index);
+      thumbs.forEach((thumb, thumbIndex) => {
+        const active = thumbIndex === index;
+        thumb.classList.toggle("is-active", active);
+        thumb.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      host.querySelectorAll("[data-jp-pdp-slide]").forEach((slide, slideIndex) => {
+        slide.classList.toggle("is-active", slideIndex === index);
+      });
+    };
+
+    thumbs.forEach((thumb) => {
+      thumb.addEventListener("click", () => show(Number(thumb.dataset.jpPdpThumb) || 0));
+    });
+    host.querySelector(".jp-pdp-arrow--prev")?.addEventListener("click", () => show(index - 1));
+    host.querySelector(".jp-pdp-arrow--next")?.addEventListener("click", () => show(index + 1));
+    host.querySelector("[data-jp-tryon]")?.addEventListener("click", () => {
+      openPdpTryOn(unique[index], alt);
+    });
+
+    stage?.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || event.target.closest("button")) return;
+      start = { x: event.clientX, y: event.clientY };
+    });
+    stage?.addEventListener("pointerup", (event) => {
+      if (!start) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.abs(dx) > 38 && Math.abs(dx) > Math.abs(dy)) show(index + (dx < 0 ? 1 : -1));
+      start = null;
+    });
+    ["pointercancel", "lostpointercapture"].forEach((name) => {
+      stage?.addEventListener(name, () => {
+        start = null;
+      });
+    });
+  };
+
+  const setupProductPage = () => {
+    if (!/^\/product\/\d+\/?$/.test(window.location.pathname)) return;
+    const main = document.querySelector("main");
+    const grid = main?.querySelector("section > div.mx-auto.mt-6.grid");
+    if (!main || !grid || grid.dataset.jpPdpReady) return;
+    const galleryWrap = grid.children[0];
+    const info = grid.children[1];
+    const accordions = grid.children[2];
+    const title = info?.querySelector("h1");
+    if (!galleryWrap || !info || !title) return;
+
+    grid.dataset.jpPdpReady = "true";
+    grid.classList.add("jp-pdp-layout");
+    galleryWrap.classList.add("jp-pdp-gallery-wrap");
+    info.classList.add("jp-pdp-info");
+    accordions?.classList.add("jp-pdp-accordions");
+    document.body.classList.add("jp-pdp-page");
+
+    const breadcrumb = main.querySelector("section > div.mx-auto.pt-6");
+    breadcrumb?.classList.add("jp-pdp-breadcrumb");
+
+    const imageUrls = [
+      ...new Set(
+        Array.from(galleryWrap.querySelectorAll("img"))
+          .map((image) => image.getAttribute("src"))
+          .filter(Boolean),
+      ),
+    ];
+    const productName = title.textContent.trim();
+    const gallery = document.createElement("div");
+    gallery.className = "jp-pdp-gallery";
+    gallery.dataset.jpPdpGallery = "true";
+    galleryWrap.replaceChildren(gallery);
+    renderPdpGallery(gallery, imageUrls, productName);
+
+    const content = info.querySelector(".font-nav") || info;
+    const brandNode = title.previousElementSibling;
+    const brand = brandNode?.textContent.trim() || "";
+    brandNode?.classList.add("jp-pdp-brand");
+    const type = pdpSpecValue(main, "Frame type");
+    const material = pdpSpecValue(main, "Material");
+    const subtitle = document.createElement("p");
+    subtitle.className = "jp-pdp-subtitle";
+    subtitle.textContent =
+      [type, material].filter(Boolean).join(" · ") || brand || "JP Eyewear";
+    title.classList.add("jp-pdp-title");
+    title.insertAdjacentElement("afterend", subtitle);
+
+    const priceSpan = main.querySelector('span[class*="text-[19px]"]');
+    const priceRow = priceSpan?.parentElement;
+    const finance = priceRow?.nextElementSibling;
+    const rule = finance?.nextElementSibling;
+    const colorParagraph = Array.from(content.querySelectorAll("p")).find((paragraph) =>
+      /^Color:\s*/i.test(paragraph.textContent.trim()),
+    );
+    const colorRow = colorParagraph?.nextElementSibling;
+    const actions = content.querySelector("div.mt-8.grid.grid-cols-2.gap-3");
+    const trust = actions?.nextElementSibling;
+    const tags = trust?.nextElementSibling;
+
+    priceRow?.classList.add("jp-pdp-price-row");
+    priceSpan?.classList.add("jp-pdp-price");
+    if (finance?.tagName === "BUTTON") finance.classList.add("jp-pdp-finance");
+    rule?.classList.add("jp-pdp-rule");
+    colorParagraph?.classList.add("jp-pdp-color");
+    colorRow?.classList.add("jp-pdp-colors");
+    actions?.classList.add("jp-pdp-actions");
+    if (trust?.tagName === "UL") trust.classList.add("jp-pdp-trust");
+    tags?.classList.add("jp-pdp-tags");
+    if (colorParagraph) {
+      const label = Array.from(colorParagraph.childNodes).find(
+        (node) => node.nodeType === Node.TEXT_NODE,
+      );
+      if (label) label.textContent = "Lens color ";
+    }
+
+    const sourceDescription = Array.from(accordions?.querySelectorAll("p") || []).find(
+      (paragraph) => paragraph.textContent.trim().length > 90,
+    );
+    if (actions && sourceDescription) {
+      const description = document.createElement("p");
+      description.className = "jp-pdp-description";
+      description.textContent = sourceDescription.textContent.trim();
+      actions.insertAdjacentElement("afterend", description);
+      sourceDescription.remove();
+    }
+
+    const tools = document.createElement("div");
+    tools.className = "jp-pdp-tools";
+    tools.dataset.jpPdpTools = "true";
+    tools.innerHTML =
+      '<button type="button" data-jp-size-chart>Size chart</button><button type="button" data-jp-try-on>Try on</button>';
+    if (actions) actions.parentElement.insertBefore(tools, actions);
+    tools.querySelector("[data-jp-size-chart]")?.addEventListener("click", () => {
+      openPdpSizeChart(main, productName);
+    });
+    tools.querySelector("[data-jp-try-on]")?.addEventListener("click", () => {
+      const current = gallery.querySelector(".jp-pdp-slide.is-active img")?.getAttribute("src");
+      openPdpTryOn(current || imageUrls[0], productName);
+    });
+
+    const addButton = actions
+      ? Array.from(actions.querySelectorAll("button")).find((button) =>
+          /^add to cart$/i.test(button.textContent.trim()),
+        )
+      : null;
+    const sticky = document.createElement("div");
+    sticky.className = "jp-pdp-sticky";
+    sticky.dataset.jpPdpSticky = "true";
+    sticky.innerHTML = `<div class="jp-pdp-sticky__meta">
+      <span class="jp-pdp-sticky__price" data-jp-pdp-sticky-price>${escapeHtml(priceSpan?.textContent.trim() || "")}</span>
+      <span class="jp-pdp-sticky__variant" data-jp-pdp-sticky-variant>${escapeHtml(colorRow?.textContent.trim() || "")}</span>
+    </div>
+    <button class="jp-pdp-sticky__button" type="button" data-jp-pdp-sticky-add${addButton?.disabled ? " disabled" : ""}>Add to cart</button>`;
+    document.body.appendChild(sticky);
+    sticky.querySelector("[data-jp-pdp-sticky-add]")?.addEventListener("click", () => {
+      if (addButton && !addButton.disabled) addButton.click();
+    });
+  };
+
+  const renderProductImageSet = (urls, alt) => {
+    const unique = [...new Set(urls.filter(Boolean))];
+    if (!unique.length) return;
+    const pdpGallery = document.querySelector("[data-jp-pdp-gallery]");
+    if (pdpGallery) {
+      renderPdpGallery(pdpGallery, unique, alt);
+      return;
+    }
+    const thumbs = Array.from(document.querySelectorAll('button[aria-label^="Photo "]'));
+    const mains = Array.from(document.querySelectorAll("img.p-10"));
+    const mobiles = Array.from(document.querySelectorAll("img.p-6"));
+
+    const thumbHost = thumbs[0]?.parentElement;
+    if (thumbHost) {
+      while (thumbs.length < unique.length && thumbs.length) {
+        const clone = thumbs[thumbs.length - 1].cloneNode(true);
+        delete clone.dataset.jpBound;
+        thumbHost.appendChild(clone);
+        thumbs.push(clone);
+      }
+      thumbs.forEach((button, index) => {
+        if (index >= unique.length) {
+          button.remove();
+          return;
+        }
+        const image = button.querySelector("img");
+        if (image) image.src = unique[index];
+        button.setAttribute("aria-label", `Photo ${index + 1}`);
+        button.classList.toggle("ring-1", index === 0);
+        button.classList.toggle("ring-black", index === 0);
+        button.classList.toggle("opacity-70", index !== 0);
+      });
+    }
+
+    const mainHost = mains[0]?.closest(".aspect-square")?.parentElement;
+    if (mainHost) {
+      while (mains.length < unique.length && mains.length) {
+        const container = mains[mains.length - 1].closest(".aspect-square");
+        if (!container) break;
+        const clone = container.cloneNode(true);
+        mainHost.appendChild(clone);
+        mains.push(clone.querySelector("img"));
+      }
+      mains.forEach((image, index) => {
+        if (index >= unique.length) {
+          image.closest(".aspect-square")?.remove();
+          return;
+        }
+        image.src = unique[index];
+        image.alt = alt;
+        image.removeAttribute("srcset");
+      });
+    }
+
+    const mobileHost = mobiles[0]?.closest(".w-full.shrink-0.snap-center")?.parentElement;
+    if (mobileHost) {
+      while (mobiles.length < unique.length && mobiles.length) {
+        const container = mobiles[mobiles.length - 1].closest(".w-full.shrink-0.snap-center");
+        if (!container) break;
+        const clone = container.cloneNode(true);
+        mobileHost.appendChild(clone);
+        mobiles.push(clone.querySelector("img"));
+      }
+      mobiles.forEach((image, index) => {
+        if (index >= unique.length) {
+          image.closest(".w-full.shrink-0.snap-center")?.remove();
+          return;
+        }
+        image.src = unique[index];
+        image.alt = alt;
+      });
+    }
+
+    const dots = document.querySelector(".mt-5.flex.justify-center.gap-2");
+    if (dots) {
+      dots.innerHTML = unique
+        .map(
+          (_, index) =>
+            `<span class="h-1.5 w-1.5 rounded-full transition-colors duration-300 ${index === 0 ? "bg-black" : "bg-black/25"}"></span>`,
+        )
+        .join("");
+    }
+
+    setupProductGallery();
+  };
+
+  const renderPdpRecommendations = (currentProduct, data) => {
+    if (!currentProduct || !Array.isArray(data?.products)) return;
+    const heading = Array.from(document.querySelectorAll("main h2")).find(
+      (node) => node.textContent.trim().toLowerCase() === "recommended",
+    );
+    const section = heading?.closest("section");
+    const carousel = section?.querySelector('[role="region"][aria-roledescription="carousel"]');
+    if (!section || !carousel) return;
+
+    const isUsable = (product) =>
+      product &&
+      Number(product.id) !== Number(currentProduct.id) &&
+      product.url &&
+      product.name &&
+      product.price &&
+      product.image &&
+      !/placeholder/i.test(String(product.image));
+    const available = data.products.filter(isUsable);
+    const sameCollection = available.filter(
+      (product) =>
+        currentProduct.collectionId &&
+        String(product.collectionId || "") === String(currentProduct.collectionId),
+    );
+    const sameBrand = available.filter(
+      (product) => normalize(product.brand) === normalize(currentProduct.brand),
+    );
+    const recommendations = [...sameCollection, ...sameBrand, ...available].filter(
+      (product, index, list) => list.findIndex((candidate) => Number(candidate.id) === Number(product.id)) === index,
+    ).slice(0, 4);
+    if (!recommendations.length) return;
+
+    section.classList.add("jp-pdp-recommendations");
+    const grid = document.createElement("div");
+    grid.className = "jp-pdp-recommendations-grid";
+    grid.setAttribute("aria-label", "Recommended products");
+    grid.innerHTML = recommendations
+      .map(
+        (product) => `<a class="jp-pdp-recommendation-card" href="${escapeHtml(product.url)}">
+          <span class="jp-pdp-recommendation-card__image"><img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"></span>
+          <span class="jp-pdp-recommendation-card__meta">
+            <span class="jp-pdp-recommendation-card__brand">${escapeHtml(product.brand || "JP")}</span>
+            <span class="jp-pdp-recommendation-card__name">${escapeHtml(product.name)}</span>
+            <span class="jp-pdp-recommendation-card__price">${escapeHtml(product.price)}</span>
+          </span>
+        </a>`,
+      )
+      .join("");
+    carousel.replaceWith(grid);
+  };
+
+  const setupProductVariants = () => {
+    const match = window.location.pathname.match(/^\/product\/(\d+)\/?$/);
+    if (!match) return Promise.resolve();
+    const productId = Number(match[1]);
+
+    const findSpecLabel = (label) =>
+      Array.from(document.querySelectorAll("main span.text-neutral-500")).find(
+        (span) => span.textContent.trim() === label,
+      );
+
+    const updateSpec = (label, value) => {
+      if (!value) return;
+      const span = findSpecLabel(label);
+      const target = span?.nextElementSibling;
+      if (target) target.textContent = String(value);
+    };
+
+    const ensureSpec = (label, value, afterLabel) => {
+      if (!value) return;
+      const current = findSpecLabel(label);
+      if (current) {
+        const target = current.nextElementSibling;
+        if (target) target.textContent = String(value);
+        return;
+      }
+      const anchor = findSpecLabel(afterLabel);
+      const row = anchor?.parentElement;
+      if (!row || !row.parentElement) return;
+      const clone = row.cloneNode(true);
+      const cloneLabel = clone.querySelector("span.text-neutral-500");
+      const cloneValue = cloneLabel?.nextElementSibling;
+      if (!cloneLabel || !cloneValue) return;
+      cloneLabel.textContent = label;
+      cloneValue.textContent = String(value);
+      row.after(clone);
+    };
+
+    return loadIndex()
+      .then((data) => {
+        const product = (data.products || []).find(
+          (item) => Number(item.id) === productId || item.url === window.location.pathname,
+        );
+        if (!product) return;
+        const variants = (Array.isArray(product.variants) ? product.variants : []).filter(
+          (variant) => variant && variant.isActive !== false,
+        );
+        if (!variants.length) return;
+        renderPdpRecommendations(product, data);
+
+        document.querySelector("[data-jp-variants]")?.remove();
+        document.querySelector("[data-jp-pdp-requirements-wrap]")?.remove();
+
+        const main = document.querySelector("main");
+        const actionGrid = document.querySelector("main div.mt-8.grid.grid-cols-2.gap-3");
+        if (!main || !actionGrid) return;
+
+        const detailsHost = main.querySelector(".jp-pdp-accordions");
+        renderPdpDetails(detailsHost, product, variants[0], null);
+        loadContent().then((content) => {
+          if (!detailsHost || !content?.delivery) return;
+          updatePdpDeliveryDetails(detailsHost, content.delivery);
+        });
+
+        const allImages = Array.isArray(product.images) ? product.images : [];
+        const baseImages = allImages
+          .filter((image) => !image?.variantId)
+          .map((image) => image?.url)
+          .filter(Boolean);
+        const productImage =
+          baseImages[0] || product.image || "/mirror-assets/placeholder.svg";
+        const galleryFor = (variant) => {
+          const dedicated = [
+            ...(Array.isArray(variant.images) ? variant.images : []),
+            ...allImages.filter(
+              (image) => Number(image?.variantId) === Number(variant?.id) && Number(variant?.id) > 0,
+            ),
+          ]
+            .map((image) => image?.url)
+            .filter(Boolean);
+          if (dedicated.length) {
+            return [...new Set([variant.image, ...dedicated].filter(Boolean))];
+          }
+          return [...new Set([variant.image, ...baseImages, productImage].filter(Boolean))];
+        };
+        const thumbFor = (variant) =>
+          variant?.image ||
+          variant?.images?.find?.((image) => image?.url)?.url ||
+          galleryFor(variant)[0] ||
+          productImage;
+
+        const uniqueValues = (key) => {
+          const seen = new Set();
+          const values = [];
+          variants.forEach((variant) => {
+            const value = variant[key];
+            if (!value || seen.has(String(value))) return;
+            seen.add(String(value));
+            values.push(String(value));
+          });
+          return values;
+        };
+
+        const shapes = uniqueValues("shape");
+        const sizes = uniqueValues("size");
+        const colors = [];
+        const seenColors = new Set();
+        variants.forEach((variant) => {
+          if (!variant.color) return;
+          const key = `${variant.color}|${variant.colorCode || ""}`;
+          if (seenColors.has(key)) return;
+          seenColors.add(key);
+          colors.push(variant);
+        });
+
+        if (!shapes.length && !colors.length && !sizes.length) return;
+
+        const variantFor = (key, value) =>
+          variants.find((variant) => String(variant[key] ?? "") === String(value));
+
+        const groupMarkup = (name, label, options, kind) => {
+          if (!options.length) return "";
+          const buttons = options
+            .map((option) => {
+              if (kind === "swatch") {
+                const variant = option;
+                const swatchImage = thumbFor(variant);
+                return `<button type="button" class="jp-swatch" role="radio" aria-checked="false" data-value="${escapeHtml(variant.color)}" title="${escapeHtml(variantSummary(variant))}">
+                  <span class="jp-swatch__chip" style="background-color:${escapeHtml(swatchColor(variant))};${swatchImage ? `background-image:url('${escapeHtml(swatchImage)}');` : ""}"></span>
+                  <span class="jp-swatch__label">${escapeHtml(variant.color)}</span>
+                  ${variant.colorCode ? `<span class="jp-swatch__code">${escapeHtml(variant.colorCode)}</span>` : ""}
+                </button>`;
+              }
+              if (kind === "thumb") {
+                const value = option;
+                const variant = variantFor(name, value);
+                return `<button type="button" class="jp-variant-thumb" role="radio" aria-checked="false" data-value="${escapeHtml(value)}" title="${escapeHtml(value)}">
+                  <span class="jp-variant-thumb__img"><img src="${escapeHtml(thumbFor(variant))}" alt="" loading="lazy"></span>
+                  <span class="jp-variant-thumb__label">${escapeHtml(value)}</span>
+                </button>`;
+              }
+              return `<button type="button" class="jp-size" role="radio" aria-checked="false" data-value="${escapeHtml(option)}" title="${escapeHtml(option)}">${escapeHtml(option)}</button>`;
+            })
+            .join("");
+          const kindClass = kind === "swatch" ? "swatches" : kind === "thumb" ? "thumbs" : "sizes";
+          return `<div class="jp-variant-group" data-jp-group="${name}">
+            <div class="jp-variant-group__head"><span>${label}</span><em data-jp-value="${name}"></em></div>
+            <div class="jp-variant-options jp-variant-options--${kindClass}" role="radiogroup" aria-label="${label}">${buttons}</div>
+          </div>`;
+        };
+
+        const panel = document.createElement("section");
+        panel.className = "jp-variants";
+        panel.dataset.jpVariants = "true";
+        panel.setAttribute("aria-label", "Choose your eyewear");
+        panel.innerHTML = `
+          <div class="jp-variants__head">
+            <div>
+              <p class="jp-variants__eyebrow">Configure your pair</p>
+              <p class="jp-variants__summary" data-jp-variant-summary></p>
+            </div>
+            <span class="jp-variants__stock" data-jp-variant-stock></span>
+          </div>
+          <div class="jp-variants__meta">
+            <span>SKU <strong data-jp-variant-sku></strong></span>
+            <span>Availability <strong data-jp-variant-availability></strong></span>
+          </div>
+          ${groupMarkup("color", "Frame color", colors, "swatch")}
+          ${groupMarkup("shape", "Shape", shapes, "thumb")}
+          ${groupMarkup("size", "Size", sizes, "size")}
+        `;
+
+        const colorParagraph = Array.from(main.querySelectorAll("p")).find((paragraph) =>
+          /^(?:Color|Lens color)\b/i.test(paragraph.textContent.trim()),
+        );
+        const colorRow = colorParagraph?.nextElementSibling;
+        if (colorParagraph) colorParagraph.style.display = "none";
+        if (colorRow && colorRow.classList.contains("flex")) colorRow.style.display = "none";
+
+        const tools = actionGrid.parentElement.querySelector("[data-jp-pdp-tools]");
+        actionGrid.parentElement.insertBefore(panel, tools || actionGrid);
+
+        const requirementsWrap = document.createElement("div");
+        requirementsWrap.className = "jp-pdp-requirements";
+        requirementsWrap.dataset.jpPdpRequirementsWrap = "true";
+        requirementsWrap.innerHTML = `<label for="jp-pdp-requirements-field">Customer requirements <span>Optional</span></label>
+          <textarea id="jp-pdp-requirements-field" data-jp-pdp-requirements maxlength="1000" rows="3" placeholder="Share fit notes, preferences, or customization instructions before adding to your bag."></textarea>
+          <p>These notes stay with this item through checkout.</p>`;
+        actionGrid.parentElement.insertBefore(requirementsWrap, tools || actionGrid);
+
+        const summaryNode = panel.querySelector("[data-jp-variant-summary]");
+        const skuNode = panel.querySelector("[data-jp-variant-sku]");
+        const stockNode = panel.querySelector("[data-jp-variant-stock]");
+        const availabilityNode = panel.querySelector("[data-jp-variant-availability]");
+
+        const markGroup = (name, value) => {
+          panel.querySelectorAll(`[data-jp-group="${name}"] [data-value]`).forEach((button) => {
+            const active = String(button.getAttribute("data-value")) === String(value ?? "");
+            button.classList.toggle("is-selected", active);
+            button.setAttribute("aria-checked", active ? "true" : "false");
+          });
+          const label = panel.querySelector(`[data-jp-value="${name}"]`);
+          if (label) label.textContent = value || "—";
+        };
+
+        const sync = (variant) => {
+          activeProductVariant = variant;
+          markGroup("shape", variant.shape);
+          markGroup("color", variant.color);
+          markGroup("size", variant.size);
+
+          if (summaryNode) summaryNode.textContent = variantSummary(variant);
+          updatePdpDetails(detailsHost, product, variant);
+          if (skuNode) skuNode.textContent = variant.sku || "—";
+          const stock = variant.stock;
+          const hasStock = stock !== null && stock !== undefined && Number.isFinite(Number(stock));
+          const stockValue = hasStock ? Number(stock) : null;
+          const stockLabel =
+            stockValue === null
+              ? "In stock"
+              : stockValue <= 0
+                ? "Out of stock"
+                : stockValue <= 3
+                  ? `Only ${stockValue} left`
+                  : "In stock";
+          if (stockNode) {
+            stockNode.textContent = stockLabel;
+            stockNode.classList.toggle("is-out", stockValue !== null && stockValue <= 0);
+            stockNode.classList.toggle("is-low", stockValue !== null && stockValue > 0 && stockValue <= 3);
+          }
+          if (availabilityNode) availabilityNode.textContent = stockLabel;
+
+          const price = variant.price || variantMoney(variant.priceValue, variant.currency);
+          document.querySelectorAll('main span[class*="text-[19px]"]').forEach((span) => {
+            if (span.closest("[data-jp-variants]")) return;
+            span.textContent = price;
+          });
+          if (colorParagraph) {
+            const value = colorParagraph.querySelector("span");
+            if (value) value.textContent = variant.color || "";
+          }
+
+          const split = splitVariantShape(variant.shape || product.shape);
+          updateSpec("Shape", variant.shape || product.shape);
+          ensureSpec("Design", variant.design || split.design, "Shape");
+          updateSpec("Frame type", product.type);
+          updateSpec("Gender", product.gender);
+          updateSpec("Material", product.material);
+          updateSpec("Size", variant.size || product.size);
+          updateSpec("Color code", variant.colorCode || product.colorCode);
+          updateSpec("Model", product.model);
+
+          renderProductImageSet(galleryFor(variant), variant.imageAlt || product.name);
+
+          const soldOut = stockValue !== null && stockValue <= 0;
+          Array.from(actionGrid.querySelectorAll("button")).forEach((button) => {
+            if (!/^(add to cart|buy it now)$/i.test(button.textContent.trim())) return;
+            button.disabled = soldOut;
+            button.setAttribute("aria-disabled", soldOut ? "true" : "false");
+          });
+
+          const stickyPrice = document.querySelector("[data-jp-pdp-sticky-price]");
+          if (stickyPrice) stickyPrice.textContent = price;
+          const stickyVariant = document.querySelector("[data-jp-pdp-sticky-variant]");
+          if (stickyVariant) stickyVariant.textContent = variantSummary(variant);
+          const stickyAdd = document.querySelector("[data-jp-pdp-sticky-add]");
+          if (stickyAdd) {
+            stickyAdd.disabled = soldOut;
+            stickyAdd.textContent = soldOut ? "Sold out" : "Add to cart";
+          }
+
+          if (variant.id) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("variant_id", String(variant.id));
+            window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+          }
+        };
+
+        const choose = (key, value) => {
+          const candidates = variants.filter(
+            (variant) => String(variant[key] ?? "") === String(value ?? ""),
+          );
+          if (!candidates.length) return;
+          const current = activeProductVariant;
+          const best =
+            candidates.find((candidate) =>
+              ["shape", "color", "size"].every(
+                (dimension) =>
+                  dimension === key ||
+                  !current ||
+                  String(candidate[dimension] ?? "") === String(current[dimension] ?? ""),
+              ),
+            ) || candidates[0];
+          sync(best);
+        };
+
+        panel.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-jp-group] [data-value]");
+          if (!button) return;
+          const group = button.closest("[data-jp-group]");
+          choose(group.dataset.jpGroup, button.getAttribute("data-value"));
+        });
+
+        const buyButton = Array.from(actionGrid.querySelectorAll("button")).find((button) =>
+          /^buy it now$/i.test(button.textContent.trim()),
+        );
+        if (buyButton && !buyButton.dataset.jpBuyBound) {
+          buyButton.dataset.jpBuyBound = "true";
+          buyButton.type = "button";
+          buyButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (buyButton.disabled) return;
+            Array.from(actionGrid.querySelectorAll("button"))
+              .find((button) => /^add to cart$/i.test(button.textContent.trim()))
+              ?.click();
+            window.setTimeout(() => {
+              window.location.href = "/cart";
+            }, 120);
+          });
+        }
+
+        const requested = Number(new URLSearchParams(window.location.search).get("variant_id") || 0);
+        const initial =
+          variants.find((variant) => Number(variant.id) === requested) || variants[0];
+        sync(initial);
+      })
+      .catch(() => {});
+  };
+
   const setupProfilePage = () => {
     if (window.location.pathname !== "/profile") return;
     const main = document.querySelector("main");
@@ -2690,13 +3977,16 @@
         const path = window.location.pathname;
         if (path === "/shop") {
           const grid = document.querySelector("main > .grid");
-          if (grid) delete grid.dataset.jpCatalogBound;
+          if (grid) {
+            delete grid.dataset.jpCatalogBound;
+            delete grid.dataset.jpShopSsr;
+          }
           setupShopCatalog();
         } else if (path === "/customize" && [...topics].some((topic) => topic.startsWith("customizer_"))) {
           reload();
         } else if (/^\/product\/\d+\/?$/.test(path)) {
           if ([...topics].some((topic) => topic.startsWith("customizer_"))) window.location.reload();
-          else setupProductMedia();
+          else setupProductVariants();
         }
       }
 
@@ -2740,6 +4030,8 @@
   };
 
   setupProductActions();
+  setupProductPage();
+  const productBoot = setupProductVariants();
   setupCustomizerNavigation();
   setupProductCustomizer();
   setupCartPage();
@@ -2764,5 +4056,9 @@
   setupCallButton();
   setupLiveUpdates();
 
-  document.documentElement.classList.add("jp-ui-ready");
+  if (productBoot && typeof productBoot.finally === "function") {
+    productBoot.finally(() => document.documentElement.classList.add("jp-ui-ready"));
+  } else {
+    document.documentElement.classList.add("jp-ui-ready");
+  }
 })();

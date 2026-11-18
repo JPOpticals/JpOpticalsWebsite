@@ -40,6 +40,7 @@ export type AdminField = {
 export type AdminResourceKey =
   | "categories"
   | "products"
+  | "product-variants"
   | "customizer-frames"
   | "customizer-lenses"
   | "orders"
@@ -235,6 +236,44 @@ export const ADMIN_RESOURCES: Record<AdminResourceKey, AdminResource> = {
       SORT_ORDER,
     ],
   },
+  "product-variants": {
+    key: "product-variants",
+    label: "Product Variants",
+    singular: "Product variant",
+    description: "Shapes, designs, colors, sizes, images and stock for each product.",
+    table: "product_variants",
+    idColumn: "id",
+    canCreate: true,
+    canDelete: true,
+    searchFields: ["sku", "shape", "design", "color", "size"],
+    defaultSort: { column: "sort_order", ascending: true },
+    uploadRoot: "jp/variants",
+    fields: [
+      { name: "id", label: "Variant ID", type: "number", readOnly: true, hideInForm: true },
+      { name: "product_id", label: "Product ID", type: "number", required: true, min: 1, help: "The catalog product this variant belongs to." },
+      { name: "sku", label: "SKU", type: "text", placeholder: "JP-BB0341O-BLK-M" },
+      { name: "shape", label: "Shape", type: "text", placeholder: "Cat-Eye" },
+      { name: "design", label: "Design", type: "text", placeholder: "Full Frame" },
+      { name: "color", label: "Color", type: "text", placeholder: "Black" },
+      { name: "color_code", label: "Color code", type: "text", placeholder: "#171717 or 001" },
+      { name: "size", label: "Size", type: "text", placeholder: "M" },
+      { name: "stock", label: "Stock", type: "number", min: 0, defaultValue: 0 },
+      { name: "price_override", label: "Price override", type: "money", min: 0, hideInTable: true, help: "Leave empty to use the product price." },
+      {
+        name: "image_url",
+        label: "Variant thumbnail",
+        type: "image",
+        uploadFolder: "jp/variants",
+        fileIdField: "image_file_id",
+        hideInTable: true,
+      },
+      { name: "image_file_id", label: "Image file ID", type: "text", hideInTable: true, hideInForm: true },
+      { name: "image_alt", label: "Image alt text", type: "text", hideInTable: true },
+      { name: "is_active", label: "Active", type: "boolean", defaultValue: true },
+      SORT_ORDER,
+      { name: "metadata", label: "Metadata (JSON)", type: "json", rows: 3, hideInTable: true },
+    ],
+  },
   "customizer-frames": {
     key: "customizer-frames",
     label: "Customizer Frames",
@@ -388,7 +427,7 @@ export const ADMIN_RESOURCES: Record<AdminResourceKey, AdminResource> = {
     searchFields: ["order_number", "email"],
     defaultSort: { column: "placed_at", ascending: false },
     detailSelect:
-      "*, order_items(id,product_id,name,image_url,unit_price,quantity,line_total)",
+      "*, order_items(id,product_id,variant_id,name,image_url,unit_price,quantity,line_total,customer_requirements,metadata)",
     fields: [
       { name: "order_number", label: "Order", type: "text", readOnly: true },
       { name: "email", label: "Email", type: "email", required: true },

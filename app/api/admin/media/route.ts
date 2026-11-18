@@ -13,6 +13,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 type ImageRow = {
   id: string;
   product_id: number;
+  variant_id: number | null;
   url: string;
   thumbnail_url: string | null;
   imagekit_file_id: string | null;
@@ -31,6 +32,7 @@ type ImageRow = {
 const serialize = (row: ImageRow) => ({
   id: row.id,
   productId: row.product_id,
+  variantId: row.variant_id,
   url: row.url,
   thumbnailUrl: row.thumbnail_url,
   fileId: row.imagekit_file_id,
@@ -58,16 +60,25 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request);
     const productId = Number(request.nextUrl.searchParams.get("productId"));
-    if (!Number.isInteger(productId) || productId <= 0) {
-      throw new HttpError(400, "A valid productId is required.");
+    const variantId = Number(request.nextUrl.searchParams.get("variantId"));
+    const hasVariant = Number.isInteger(variantId) && variantId > 0;
+    if (!hasVariant && (!Number.isInteger(productId) || productId <= 0)) {
+      throw new HttpError(400, "A valid productId or variantId is required.");
     }
 
-    const { data, error } = await getAdminClient()
+    let query = getAdminClient()
       .from("product_images")
       .select(
-        "id,product_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
-      )
-      .eq("product_id", productId)
+        "id,product_id,variant_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
+      );
+
+    if (hasVariant) {
+      query = query.eq("variant_id", variantId);
+    } else {
+      query = query.eq("product_id", productId).is("variant_id", null);
+    }
+
+    const { data, error } = await query
       .order("is_primary", { ascending: false })
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -83,9 +94,13 @@ export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request);
     const form = await request.formData();
-    const productId = Number(form.get("productId"));
+    const variantIdInput = Number(form.get("variantId"));
+    const variantId =
+      Number.isInteger(variantIdInput) && variantIdInput > 0 ? variantIdInput : null;
+    let productId = Number(form.get("productId"));
     if (!Number.isInteger(productId) || productId <= 0) {
-      throw new HttpError(400, "A valid productId is required.");
+      if (!variantId) throw new HttpError(400, "A valid productId or variantId is required.");
+      productId = 0;
     }
 
     const files = [...form.getAll("files"), ...form.getAll("file")].filter(
@@ -99,6 +114,20 @@ export async function POST(request: NextRequest) {
     const alt = String(form.get("alt") ?? "").trim();
     const folderInput = String(form.get("folder") ?? "").trim();
 
+    let variantName = "";
+    if (variantId) {
+      const { data: variant, error: variantError } = await admin
+        .from("product_variants")
+        .select("id,product_id,sku")
+        .eq("id", variantId)
+        .maybeSingle();
+      if (variantError) throw new HttpError(400, variantError.message);
+      if (!variant) throw new HttpError(404, "Variant not found.");
+      const row = variant as { product_id: number; sku: string | null };
+      productId = Number(row.product_id);
+      variantName = row.sku || `variant-${variantId}`;
+    }
+
     const { data: product, error: productError } = await admin
       .from("products")
       .select("id,name")
@@ -107,20 +136,25 @@ export async function POST(request: NextRequest) {
     if (productError) throw new HttpError(400, productError.message);
     if (!product) throw new HttpError(404, "Product not found.");
 
-    const folder = (folderInput || `jp/products/${productId}`).replace(/^\/+|\/+$/g, "");
+    const folder = (
+      folderInput ||
+      (variantId ? `jp/variants/${productId}/${variantName}` : `jp/products/${productId}`)
+    ).replace(/^\/+|\/+$/g, "");
 
     if (replaceId) {
       if (files.length !== 1) {
         throw new HttpError(400, "Replacement accepts exactly one image.");
       }
-      const { data: existing, error: existingError } = await admin
+      let existingQuery = admin
         .from("product_images")
         .select(
-          "id,product_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
+          "id,product_id,variant_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
         )
         .eq("id", replaceId)
-        .eq("product_id", productId)
-        .maybeSingle();
+        .eq("product_id", productId);
+      if (variantId) existingQuery = existingQuery.eq("variant_id", variantId);
+      else existingQuery = existingQuery.is("variant_id", null);
+      const { data: existing, error: existingError } = await existingQuery.maybeSingle();
       if (existingError) throw new HttpError(400, existingError.message);
       if (!existing) throw new HttpError(404, "Image not found for this product.");
 
@@ -128,7 +162,9 @@ export async function POST(request: NextRequest) {
         file: files[0],
         fileName: files[0].name,
         folder,
-        tags: ["jp-product", `product-${productId}`],
+        tags: variantId
+          ? ["jp-variant", `product-${productId}`, `variant-${variantId}`]
+          : ["jp-product", `product-${productId}`],
       });
 
       const { data: updated, error: updateError } = await admin
@@ -152,7 +188,7 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", replaceId)
         .select(
-          "id,product_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
+          "id,product_id,variant_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
         )
         .single();
 
@@ -169,18 +205,22 @@ export async function POST(request: NextRequest) {
       return json({ ok: true, image: serialize(updated as ImageRow) });
     }
 
-    const { data: existingRows, error: countError } = await admin
+    let existingQuery = admin
       .from("product_images")
       .select("id,is_primary,sort_order")
       .eq("product_id", productId);
+    if (variantId) existingQuery = existingQuery.eq("variant_id", variantId);
+    else existingQuery = existingQuery.is("variant_id", null);
+    const { data: existingRows, error: countError } = await existingQuery;
     if (countError) throw new HttpError(400, countError.message);
 
     const existing = existingRows ?? [];
     const nextSort =
       existing.reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), -1) + 1;
-    const makePrimary =
-      String(form.get("setPrimary") ?? "").toLowerCase() === "true" ||
-      !existing.some((row) => row.is_primary);
+    const makePrimary = variantId
+      ? false
+      : String(form.get("setPrimary") ?? "").toLowerCase() === "true" ||
+        !existing.some((row) => row.is_primary);
 
     const created: ImageRow[] = [];
     for (const [index, file] of files.entries()) {
@@ -188,13 +228,16 @@ export async function POST(request: NextRequest) {
         file,
         fileName: file.name,
         folder,
-        tags: ["jp-product", `product-${productId}`],
+        tags: variantId
+          ? ["jp-variant", `product-${productId}`, `variant-${variantId}`]
+          : ["jp-product", `product-${productId}`],
       });
 
       const { data: inserted, error: insertError } = await admin
         .from("product_images")
         .insert({
           product_id: productId,
+          variant_id: variantId,
           url: uploaded.url,
           thumbnail_url: uploaded.thumbnailUrl,
           imagekit_file_id: uploaded.fileId,
@@ -213,7 +256,7 @@ export async function POST(request: NextRequest) {
           },
         })
         .select(
-          "id,product_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
+          "id,product_id,variant_id,url,thumbnail_url,imagekit_file_id,imagekit_file_path,alt,width,height,size_bytes,mime_type,provider,is_primary,sort_order,metadata",
         )
         .single();
 

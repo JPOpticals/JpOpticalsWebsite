@@ -15,6 +15,7 @@ type OrderItemInput = {
   customizerFrameId?: unknown;
   customizerLensId?: unknown;
   quantity?: unknown;
+  requirements?: unknown;
 };
 
 export async function GET(request: NextRequest) {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await getAdminClient()
       .from("orders")
       .select(
-        "id,order_number,status,payment_status,fulfillment_status,subtotal,shipping_total,tax_total,discount_total,total,currency,placed_at,order_items(id,product_id,name,image_url,unit_price,quantity,line_total)",
+        "id,order_number,status,payment_status,fulfillment_status,subtotal,shipping_total,tax_total,discount_total,total,currency,placed_at,order_items(id,product_id,variant_id,name,image_url,unit_price,quantity,line_total,customer_requirements,metadata)",
       )
       .eq("customer_id", auth.user.id)
       .order("placed_at", { ascending: false })
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       }
       const customizerFrameId = String(item.customizerFrameId ?? "").trim();
       const customizerLensId = String(item.customizerLensId ?? "").trim();
+      const requirements = String(item.requirements ?? "").trim().slice(0, 1000);
       if ((customizerFrameId && !customizerLensId) || (!customizerFrameId && customizerLensId)) {
         throw new HttpError(400, "A custom frame and lens must be selected together.");
       }
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
         ...(customizerFrameId && customizerLensId
           ? { customizerFrameId, customizerLensId }
           : {}),
+        ...(requirements ? { requirements } : {}),
       };
     });
 

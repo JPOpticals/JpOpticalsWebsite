@@ -108,6 +108,25 @@ function productFromHtml(file) {
     text(html.match(/<span[^>]*class="[^"]*text-\[19px\][^"]*"[^>]*>([^<]+)<\/span>/)?.[1] ?? "") ||
     "";
   const color = (block.match(/Color:\s*\n?\s*([^\n]+)/i)?.[1] ?? "").trim();
+  const colorOptions = [];
+  const colorStart = html.indexOf("Color:");
+  const colorEnd = colorStart >= 0 ? html.indexOf(">Add to cart<", colorStart) : -1;
+  const colorBlock = html.slice(colorStart, colorEnd > colorStart ? colorEnd : colorStart + 5000);
+  const seenColors = new Set();
+  for (const match of colorBlock.matchAll(/<button\b[^>]*>/gi)) {
+    const tag = match[0];
+    const name = decode(attr(tag, "title") || attr(tag, "aria-label")).trim();
+    if (!name) continue;
+    const style = attr(tag, "style");
+    const colorCode = style.match(/background-color\s*:\s*([^;]+)/i)?.[1]?.trim() || null;
+    const key = `${name.toLowerCase()}|${colorCode || ""}`;
+    if (seenColors.has(key)) continue;
+    seenColors.add(key);
+    colorOptions.push({ name, colorCode, sortOrder: colorOptions.length });
+  }
+  if (!colorOptions.length && color) {
+    colorOptions.push({ name: color, colorCode: null, sortOrder: 0 });
+  }
   const frameType = readLabel(detailsBlock, "Frame type") || "Eyewear";
 
   const images = [];
@@ -161,6 +180,7 @@ function productFromHtml(file) {
     material: details.material,
     color: details.color,
     colorCode: details.colorCode,
+    colorOptions,
     size: details.size,
     price: num(priceText),
     currency: "USD",
@@ -248,6 +268,14 @@ function reviewsFromHomepage() {
   return reviews;
 }
 
+function splitVariantShape(value) {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(.*?)\s+(Full Frame|Half Rimless|Rimless)$/i);
+  if (match) return { shape: match[1].trim(), design: match[2] };
+  if (/^rimless$/i.test(raw)) return { shape: "Rimless", design: "Rimless" };
+  return { shape: raw || "Classic", design: "Full Frame" };
+}
+
 function variantsFromSite(products) {
   const productIds = new Set(products.map((product) => product.id));
   const hashes = [
@@ -259,21 +287,59 @@ function variantsFromSite(products) {
       .map((name) => fs.readFileSync(path.join(MIRROR, name), "utf8")),
   ].join("\n");
 
-  const variants = new Map();
+  const siteVariants = new Map();
   for (const match of hashes.matchAll(/\/product\/(\d+)[^"'\s<>]*?[?&]variant_id=(\d+)/g)) {
     const productId = Number(match[1]);
     const variantId = Number(match[2]);
-    if (!productIds.has(productId) || variants.has(variantId)) continue;
-    variants.set(variantId, {
-      id: variantId,
-      productId,
-      color: null,
-      colorCode: null,
-      size: null,
-      stock: 0,
+    if (!productIds.has(productId) || siteVariants.has(variantId)) continue;
+    siteVariants.set(variantId, { id: variantId, productId });
+  }
+
+  const variants = [];
+  for (const product of products) {
+    const split = splitVariantShape(product.shape || product.details?.shape);
+    const existing = [...siteVariants.values()]
+      .filter((variant) => variant.productId === product.id)
+      .sort((a, b) => a.id - b.id);
+    const colorOptions = Array.isArray(product.colorOptions) && product.colorOptions.length
+      ? product.colorOptions
+      : [{
+          name: product.color || product.details?.color || null,
+          colorCode: product.colorCode || product.details?.colorCode || null,
+          sortOrder: 0,
+        }];
+    const rows = colorOptions.map((option, index) => ({
+      id:
+        existing[index]?.id ||
+        (index === 0 && !existing.length
+          ? 700000 + product.id
+          : 1000000 + product.id * 100 + index),
+      productId: product.id,
+      color: option.name,
+      colorCode: option.colorCode,
+      sortOrder: option.sortOrder ?? index,
+    }));
+    rows.forEach((variant, index) => {
+      variants.push({
+        id: variant.id,
+        productId: product.id,
+        sku:
+          `JP-${product.id}-${String(index + 1).padStart(2, "0")}`,
+        shape: split.shape,
+        design: split.design,
+        color: variant.color || product.color || product.details?.color || null,
+        colorCode:
+          variant.colorCode || product.colorCode || product.details?.colorCode || null,
+        size: product.size || product.details?.size || null,
+        stock: 6,
+        priceOverride: null,
+        imageUrl: product.primaryImage || product.ogImage || null,
+        imageAlt: product.name || null,
+        sortOrder: variant.sortOrder,
+      });
     });
   }
-  return [...variants.values()];
+  return variants;
 }
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "mirror-manifest.json"), "utf8"));
@@ -629,10 +695,73 @@ insertRows(
 
 insertRows(
   "product_variants",
-  ["id", "product_id", "stock", "is_active"],
-  variants.map((variant) => [variant.id, variant.productId, variant.stock, "true"]),
+  [
+    "id",
+    "product_id",
+    "sku",
+    "shape",
+    "design",
+    "color",
+    "color_code",
+    "size",
+    "stock",
+    "price_override",
+    "image_url",
+    "image_alt",
+    "is_active",
+    "sort_order",
+  ],
+  variants.map((variant) => [
+    variant.id,
+    variant.productId,
+    q(variant.sku),
+    q(variant.shape),
+    q(variant.design),
+    q(variant.color),
+    q(variant.colorCode),
+    q(variant.size),
+    num(variant.stock) ?? 0,
+    variant.priceOverride === null || variant.priceOverride === undefined
+      ? "null"
+      : num(variant.priceOverride) ?? "null",
+    q(variant.imageUrl),
+    q(variant.imageAlt),
+    "true",
+    num(variant.sortOrder) ?? 0,
+  ]),
   "id",
 );
+
+if (variants.length) {
+  const chunks = [];
+  for (let index = 0; index < variants.length; index += 100) {
+    chunks.push(variants.slice(index, index + 100));
+  }
+  for (const chunk of chunks) {
+    push(
+      `update public.product_variants as pv set
+  sku = coalesce(pv.sku, v.sku),
+  shape = coalesce(pv.shape, v.shape),
+  design = coalesce(pv.design, v.design),
+  color = coalesce(pv.color, v.color),
+  color_code = coalesce(pv.color_code, v.color_code),
+  size = coalesce(pv.size, v.size),
+  image_url = coalesce(pv.image_url, v.image_url),
+  image_alt = coalesce(pv.image_alt, v.image_alt)
+from (values\n` +
+        chunk
+          .map(
+            (variant) =>
+              `  (${variant.id}, ${q(variant.sku)}, ${q(variant.shape)}, ${q(variant.design)}, ${q(variant.color)}, ${q(variant.colorCode)}, ${q(variant.size)}, ${q(variant.imageUrl)}, ${q(variant.imageAlt)})`,
+          )
+          .join(",\n") +
+        `\n) as v(id, sku, shape, design, color, color_code, size, image_url, image_alt)\nwhere pv.id = v.id;`,
+    );
+  }
+  push(
+    "select setval('public.product_variants_id_seq', coalesce((select max(id) from public.product_variants), 1), true);",
+  );
+}
 
 insertRows(
   "hero_slides",
