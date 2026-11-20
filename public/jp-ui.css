@@ -703,6 +703,797 @@
   }
 }
 
+/* Reference-aligned customizer refinements. */
+.jp-customizer--pro .jp-customizer__layout {
+  grid-template-columns: minmax(430px, .86fr) minmax(560px, 1.14fr);
+  gap: clamp(34px, 4vw, 52px);
+}
+
+.jp-customizer--pro .jp-customizer__stage {
+  border-color: #e7e0d6;
+  background: #f5f1ea;
+}
+
+.jp-customizer--pro .jp-customizer__visual-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.jp-customizer--pro .jp-customizer__visual-label span {
+  padding: 5px 9px;
+  background: #efe3bf;
+  color: #755c27;
+  font-size: 10px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.jp-customizer--pro .jp-customizer__stage-tools {
+  position: absolute;
+  z-index: 8;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  gap: 7px;
+}
+
+.jp-customizer--pro .jp-customizer__stage-tools button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #e3ddd3;
+  border-radius: 50%;
+  background: #fff;
+  color: #433a2f;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgb(59 45 28 / 10%);
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__stage-tools button:hover,
+.jp-customizer--pro .jp-customizer__stage-tools button:focus-visible {
+  border-color: #b99448;
+  background: #faf7ef;
+  transform: translateY(-1px);
+}
+
+.jp-customizer--pro .jp-customizer__stage-tools svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.jp-customizer--pro .jp-customizer__steps {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 26px;
+}
+
+.jp-customizer--pro .jp-customizer__step {
+  display: grid;
+  min-height: 64px;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 8px 5px;
+  border: 1px solid #e3ddd3;
+  background: #fff;
+  color: #4d463c;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: .02em;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__step:hover {
+  border-color: #bd9c5a;
+  background: #faf7ef;
+  transform: translateY(-1px);
+}
+
+.jp-customizer--pro .jp-customizer__step.is-active {
+  border-color: #dbc083;
+  background: #f1e2bc;
+  color: #4d3b1b;
+  box-shadow: inset 0 0 0 1px #dbc083;
+}
+
+.jp-customizer--pro .jp-customizer__step svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.jp-customizer--pro [data-jp-customizer-section] {
+  scroll-margin-top: 118px;
+}
+
+.jp-customizer--pro .jp-customizer__option-image {
+  background: #f4f0e8;
+}
+
+.jp-customizer--pro .jp-customizer__option.is-selected,
+.jp-customizer--pro .jp-customizer__lens-option.is-selected,
+.jp-customizer--pro .jp-customizer__choice.is-selected,
+.jp-customizer--pro .jp-customizer__swatch-button.is-selected {
+  border-color: #b99448;
+  box-shadow: inset 0 0 0 1px #b99448;
+}
+
+.jp-customizer--pro .jp-customizer__option.is-selected .jp-customizer__swatch {
+  border-color: #b99448;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #b99448;
+}
+
+.jp-customizer--pro .jp-customizer__option:hover,
+.jp-customizer--pro .jp-customizer__lens-option:hover,
+.jp-customizer--pro .jp-customizer__choice:hover,
+.jp-customizer--pro .jp-customizer__swatch-button:hover {
+  border-color: #c7aa6a;
+}
+
+@media (max-width: 1180px) {
+  .jp-customizer--pro .jp-customizer__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .jp-customizer--pro .jp-customizer__visual {
+    position: relative;
+    top: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .jp-customizer--pro .jp-customizer__steps {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    margin-right: -18px;
+    padding: 0 18px 4px 0;
+    scrollbar-width: none;
+  }
+
+  .jp-customizer--pro .jp-customizer__steps::-webkit-scrollbar {
+    display: none;
+  }
+
+  .jp-customizer--pro .jp-customizer__step {
+    flex: 0 0 78px;
+  }
+
+  .jp-customizer--pro .jp-customizer__visual-label {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .jp-customizer--pro .jp-customizer__stage-tools {
+    top: 10px;
+    right: 10px;
+  }
+}
+
+/* Custom eyewear studio: a quieter, denser control surface around the live product. */
+.jp-customizer--pro {
+  --studio-ink: #171513;
+  --studio-muted: #6e6961;
+  --studio-line: #ded9d0;
+  --studio-paper: #fbfaf8;
+  --studio-panel: #f3f0ea;
+  --studio-accent: #a08358;
+  margin-top: 0;
+  color: var(--studio-ink);
+  font-family: var(--font-nav), Arial, sans-serif;
+}
+
+.jp-customizer--pro button,
+.jp-customizer--pro input,
+.jp-customizer--pro select {
+  font: inherit;
+}
+
+.jp-customizer--pro button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.jp-customizer--pro .jp-customizer__head {
+  align-items: flex-end;
+  margin-bottom: 34px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.jp-customizer--pro .jp-customizer__head h1 {
+  margin: 0;
+  color: var(--studio-ink);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(38px, 5vw, 68px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: .98;
+}
+
+.jp-customizer--pro .jp-customizer__head p {
+  max-width: 510px;
+  margin: 14px 0 0;
+  color: var(--studio-muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.jp-customizer--pro .jp-customizer__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-color: var(--studio-line);
+  background: #fff;
+  color: var(--studio-muted);
+  font-size: 11px;
+  letter-spacing: .17em;
+}
+
+.jp-customizer--pro .jp-customizer__live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6e906e;
+  box-shadow: 0 0 0 4px #e4eee1;
+}
+
+.jp-customizer--pro .jp-customizer__layout {
+  grid-template-columns: minmax(0, 1.08fr) minmax(470px, .92fr);
+  gap: clamp(28px, 4vw, 72px);
+  align-items: start;
+}
+
+.jp-customizer--pro .jp-customizer__visual {
+  position: sticky;
+  top: 104px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.jp-customizer--pro .jp-customizer__visual-label {
+  padding: 0 0 13px;
+  color: var(--studio-muted);
+  font-size: 11px;
+  letter-spacing: .17em;
+}
+
+.jp-customizer--pro .jp-customizer__visual-label strong {
+  color: var(--studio-ink);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: none;
+}
+
+.jp-customizer--pro .jp-customizer__stage {
+  aspect-ratio: 1 / .86;
+  border: 1px solid var(--studio-line);
+  background: #ebe7df;
+  cursor: grab;
+  isolation: isolate;
+  touch-action: none;
+}
+
+.jp-customizer--pro .jp-customizer__stage::after {
+  position: absolute;
+  right: 12%;
+  bottom: 10%;
+  left: 12%;
+  height: 20%;
+  border-radius: 50%;
+  background: rgb(42 36 28 / 18%);
+  content: "";
+  filter: blur(20px);
+  transform: translateZ(-20px);
+}
+
+.jp-customizer--pro .jp-customizer__stage.is-dragging {
+  cursor: grabbing;
+}
+
+.jp-customizer--pro .jp-customizer__preview-scene {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  transform: perspective(1100px) rotateX(var(--preview-tilt)) rotateY(var(--preview-rotate)) scale(var(--preview-scale));
+  transform-style: preserve-3d;
+  transition: transform 360ms cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
+}
+
+.jp-customizer--pro .jp-customizer__stage.is-dragging .jp-customizer__preview-scene {
+  transition: none;
+}
+
+.jp-customizer--pro .jp-customizer__artboard {
+  position: relative;
+  width: min(92%, 760px);
+  height: min(92%, 760px);
+  aspect-ratio: 1;
+  transform-style: preserve-3d;
+}
+
+.jp-customizer--pro .jp-customizer__artboard > img {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  transition: filter 360ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__frame-finish-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #292725;
+  opacity: .82;
+  pointer-events: none;
+  mix-blend-mode: color;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.jp-customizer--pro [data-jp-frame-finish="silver"] .jp-customizer__frame-finish-layer { background: #c9cdd0; }
+.jp-customizer--pro [data-jp-frame-finish="gold"] .jp-customizer__frame-finish-layer { background: #c8a64b; }
+.jp-customizer--pro [data-jp-frame-finish="gunmetal"] .jp-customizer__frame-finish-layer { background: #4d5153; }
+.jp-customizer--pro [data-jp-frame-finish="rose-gold"] .jp-customizer__frame-finish-layer { background: #c58f82; }
+.jp-customizer--pro [data-jp-frame-finish="crystal"] .jp-customizer__frame-finish-layer { background: #d9d4c9; }
+
+.jp-customizer--pro .jp-customizer__image-tint,
+.jp-customizer--pro .jp-customizer__lens-mask {
+  z-index: 3;
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer span {
+  position: absolute;
+  left: var(--pane-x);
+  top: var(--pane-y);
+  display: block;
+  width: var(--pane-width);
+  height: var(--pane-height);
+  border: 1px solid rgb(19 20 20 / 40%);
+  background: var(--lens-color);
+  box-shadow: inset 0 0 20px rgb(255 255 255 / 20%), 0 0 0 1px rgb(255 255 255 / 18%);
+  opacity: var(--lens-opacity);
+  transform: rotate(var(--pane-rotate));
+  transform-origin: center;
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer--round span { border-radius: 50%; }
+.jp-customizer--pro .jp-customizer__lens-layer--oval span { border-radius: 48%; }
+.jp-customizer--pro .jp-customizer__lens-layer--soft-square span { border-radius: 19% 19% 27% 27%; }
+.jp-customizer--pro .jp-customizer__lens-layer--rectangle span { border-radius: 8%; }
+.jp-customizer--pro .jp-customizer__lens-layer--cat-eye span { border-radius: 12% 12% 38% 38%; transform: rotate(var(--pane-rotate)) skewY(-4deg); }
+.jp-customizer--pro .jp-customizer__lens-layer--aviator span { border-radius: 12% 12% 45% 45%; }
+.jp-customizer--pro .jp-customizer__lens-layer--butterfly span { clip-path: polygon(8% 22%, 84% 4%, 100% 55%, 77% 100%, 21% 92%, 0 52%); }
+.jp-customizer--pro .jp-customizer__lens-layer--wayfarer span { clip-path: polygon(6% 16%, 88% 8%, 100% 76%, 80% 96%, 17% 89%, 0 68%); }
+.jp-customizer--pro .jp-customizer__lens-layer--hexagon span { clip-path: polygon(22% 0, 78% 0, 100% 50%, 78% 100%, 22% 100%, 0 50%); }
+.jp-customizer--pro .jp-customizer__lens-layer--geometric span { clip-path: polygon(16% 5%, 82% 0, 100% 58%, 76% 96%, 14% 86%, 0 34%); }
+.jp-customizer--pro .jp-customizer__lens-layer--shield span { clip-path: polygon(8% 8%, 92% 8%, 100% 52%, 72% 100%, 28% 100%, 0 52%); }
+.jp-customizer--pro .jp-customizer__lens-layer--diamond span { clip-path: polygon(50% 0, 100% 45%, 74% 100%, 23% 100%, 0 45%); }
+
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-lens-design="diamond"] span {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 62%), inset 12px 0 24px rgb(255 255 255 / 14%), inset -12px 0 24px rgb(0 0 0 / 18%);
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-lens-cut="bevel"] span { border-width: 2px; }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-lens-cut="step"] span { box-shadow: inset 0 0 0 3px rgb(255 255 255 / 18%), inset 0 0 0 6px rgb(17 17 17 / 12%); }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-lens-cut="faceted"] span { clip-path: polygon(10% 8%, 46% 0, 94% 8%, 100% 55%, 74% 100%, 18% 91%, 0 44%); }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-lens-cut="contour"] span { box-shadow: inset 0 0 0 2px rgb(255 255 255 / 40%), inset 0 -10px 14px rgb(0 0 0 / 20%); }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-corners="crisp"] span { border-radius: 0; }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-corners="rounded"] span { border-radius: 32%; }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-corners="micro"] span { border-radius: 5%; }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-corners="exaggerated"] span { border-radius: 3% 25% 45% 25%; }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-corners="sculpted"] span { clip-path: polygon(10% 0, 90% 0, 100% 28%, 87% 100%, 13% 100%, 0 28%); }
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-corners="crown"] span { clip-path: polygon(0 16%, 28% 0, 50% 12%, 72% 0, 100% 16%, 88% 100%, 12% 100%); }
+
+.jp-customizer--pro .jp-customizer__engraving {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  min-width: 20px;
+  min-height: 12px;
+  place-items: center;
+  color: rgb(27 24 21 / 76%);
+  font-family: Georgia, serif;
+  font-size: clamp(9px, 1.5vw, 16px);
+  letter-spacing: .12em;
+  opacity: 0;
+  pointer-events: none;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+  transition: opacity 240ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__engraving.has-text { opacity: 1; }
+.jp-customizer--pro .jp-customizer__engraving--temple { right: 12%; top: 42%; }
+.jp-customizer--pro .jp-customizer__engraving--bridge { left: 46%; top: 34%; }
+.jp-customizer--pro .jp-customizer__engraving--inner-rim { left: 24%; bottom: 29%; transform: rotate(4deg); }
+
+.jp-customizer--pro .jp-customizer__preview-hint,
+.jp-customizer--pro .jp-customizer__preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.jp-customizer--pro .jp-customizer__preview-hint {
+  padding: 11px 0 0;
+  color: var(--studio-muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.jp-customizer--pro .jp-customizer__preview-controls {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.jp-customizer--pro .jp-customizer__preview-controls button {
+  min-width: 44px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--studio-line);
+  background: #fff;
+  color: var(--studio-ink);
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__preview-controls button:hover,
+.jp-customizer--pro .jp-customizer__preview-controls button:focus-visible {
+  border-color: var(--studio-ink);
+  background: #f1ede6;
+  transform: translateY(-1px);
+}
+
+.jp-customizer--pro .jp-customizer__preview-controls span {
+  min-width: 46px;
+  color: var(--studio-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.jp-customizer--pro .jp-customizer__visual-foot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--studio-line);
+  color: var(--studio-muted);
+  font-size: 13px;
+}
+
+.jp-customizer--pro .jp-customizer__visual-foot strong {
+  color: var(--studio-ink);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.jp-customizer--pro .jp-customizer__controls {
+  min-width: 0;
+}
+
+.jp-customizer--pro .jp-customizer__section {
+  margin: 0;
+  padding: 0 0 30px;
+  border: 0;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.jp-customizer--pro .jp-customizer__section + .jp-customizer__section {
+  margin-top: 30px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.jp-customizer--pro .jp-customizer__subhead {
+  margin-bottom: 15px;
+  color: var(--studio-ink);
+  font-size: 12px;
+  letter-spacing: .16em;
+}
+
+.jp-customizer--pro .jp-customizer__subhead small {
+  color: var(--studio-muted);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.jp-customizer--pro .jp-customizer__subhead--minor {
+  margin-top: 24px;
+  font-size: 11px;
+}
+
+.jp-customizer--pro .jp-customizer__filters {
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.jp-customizer--pro .jp-customizer__filters label,
+.jp-customizer--pro .jp-customizer__engraving-field,
+.jp-customizer--pro .jp-customizer__prescription label {
+  color: var(--studio-muted);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.jp-customizer--pro .jp-customizer__filters select,
+.jp-customizer--pro .jp-customizer__engraving-field input,
+.jp-customizer--pro .jp-customizer__engraving-field select,
+.jp-customizer--pro .jp-customizer__prescription input {
+  min-height: 46px;
+  margin-top: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--studio-line);
+  border-radius: 0;
+  background: #fff;
+  color: var(--studio-ink);
+  font-size: 14px;
+  letter-spacing: 0;
+  outline: 0;
+  text-transform: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__filters select:focus,
+.jp-customizer--pro .jp-customizer__engraving-field input:focus,
+.jp-customizer--pro .jp-customizer__engraving-field select:focus,
+.jp-customizer--pro .jp-customizer__prescription input:focus {
+  border-color: var(--studio-ink);
+  box-shadow: 0 0 0 3px rgb(160 131 88 / 18%);
+}
+
+.jp-customizer--pro .jp-customizer__options {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.jp-customizer--pro .jp-customizer__option {
+  padding-bottom: 8px;
+  border-color: var(--studio-line);
+  background: #fff;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__option:hover { transform: translateY(-2px); }
+.jp-customizer--pro .jp-customizer__option.is-selected { border-color: var(--studio-ink); box-shadow: inset 0 0 0 1px var(--studio-ink); }
+.jp-customizer--pro .jp-customizer__option-image { background: var(--studio-panel); }
+.jp-customizer--pro .jp-customizer__option-name { font-size: 13px; }
+.jp-customizer--pro .jp-customizer__option-meta { font-size: 11px; }
+
+.jp-customizer--pro .jp-customizer__swatches {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.jp-customizer--pro .jp-customizer__swatch-button {
+  display: grid;
+  min-width: 0;
+  min-height: 74px;
+  place-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: 1px solid var(--studio-line);
+  background: #fff;
+  color: var(--studio-ink);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__swatch-button:hover { transform: translateY(-2px); }
+.jp-customizer--pro .jp-customizer__swatch-button.is-selected { border-color: var(--studio-ink); background: #f1ede6; box-shadow: inset 0 0 0 1px var(--studio-ink); }
+.jp-customizer--pro .jp-customizer__swatch-button small { color: var(--studio-muted); font-size: 10px; }
+.jp-customizer--pro .jp-customizer__swatch-large { width: 29px; height: 29px; border: 1px solid rgb(23 21 19 / 28%); border-radius: 50%; background: var(--swatch); box-shadow: inset 5px 4px 8px rgb(255 255 255 / 28%); }
+.jp-customizer--pro .jp-customizer__finish-button .jp-customizer__swatch-large { border-radius: 3px; }
+
+.jp-customizer--pro .jp-customizer__shape-grid,
+.jp-customizer--pro .jp-customizer__choice-grid,
+.jp-customizer--pro .jp-customizer__corner-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.jp-customizer--pro .jp-customizer__choice-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.jp-customizer--pro .jp-customizer__choice-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.jp-customizer--pro .jp-customizer__choice {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 86px;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--studio-line);
+  background: #fff;
+  color: var(--studio-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.jp-customizer--pro .jp-customizer__choice:hover { transform: translateY(-2px); }
+.jp-customizer--pro .jp-customizer__choice.is-selected { border-color: var(--studio-ink); background: #f1ede6; box-shadow: inset 0 0 0 1px var(--studio-ink); }
+.jp-customizer--pro .jp-customizer__choice-copy strong,
+.jp-customizer--pro .jp-customizer__choice-copy small { display: block; }
+.jp-customizer--pro .jp-customizer__choice-copy strong { font-size: 12px; font-weight: 500; line-height: 1.25; }
+.jp-customizer--pro .jp-customizer__choice-copy small { margin-top: 3px; color: var(--studio-muted); font-size: 10px; line-height: 1.35; }
+.jp-customizer--pro .jp-customizer__choice-price { position: absolute; right: 8px; top: 8px; color: var(--studio-accent); font-size: 10px; }
+.jp-customizer--pro .jp-customizer__choice-visual { display: block; width: 42px; height: 26px; border: 1px solid #6b6259; background: linear-gradient(140deg, #fff, #aeb9bc); opacity: .9; }
+.jp-customizer--pro .jp-customizer__choice-visual--round { border-radius: 50%; width: 27px; height: 27px; }
+.jp-customizer--pro .jp-customizer__choice-visual--oval { border-radius: 50%; }
+.jp-customizer--pro .jp-customizer__choice-visual--soft-square { border-radius: 7px; }
+.jp-customizer--pro .jp-customizer__choice-visual--rectangle { border-radius: 2px; }
+.jp-customizer--pro .jp-customizer__choice-visual--cat-eye { clip-path: polygon(0 18%, 100% 0, 87% 100%, 18% 86%); }
+.jp-customizer--pro .jp-customizer__choice-visual--aviator { border-radius: 7px 7px 50% 50%; }
+.jp-customizer--pro .jp-customizer__choice-visual--butterfly { clip-path: polygon(0 15%, 38% 0, 100% 14%, 80% 100%, 28% 92%); }
+.jp-customizer--pro .jp-customizer__choice-visual--wayfarer { clip-path: polygon(8% 8%, 92% 0, 100% 76%, 10% 100%); }
+.jp-customizer--pro .jp-customizer__choice-visual--hexagon { clip-path: polygon(24% 0, 76% 0, 100% 50%, 76% 100%, 24% 100%, 0 50%); }
+.jp-customizer--pro .jp-customizer__choice-visual--geometric { clip-path: polygon(8% 18%, 85% 0, 100% 75%, 20% 100%); }
+.jp-customizer--pro .jp-customizer__choice-visual--shield { clip-path: polygon(0 0, 100% 0, 78% 100%, 22% 100%); }
+.jp-customizer--pro .jp-customizer__choice-visual--diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+
+.jp-customizer--pro .jp-customizer__choice-visual--regular { background: linear-gradient(140deg, #f7f4ef 20%, #9ca8aa 54%, #f7f4ef 70%); }
+.jp-customizer--pro .jp-customizer__choice-visual--diamond { box-shadow: inset 0 0 0 2px rgb(255 255 255 / 85%); }
+.jp-customizer--pro .jp-customizer__choice-visual--bevel { border-width: 2px; }
+.jp-customizer--pro .jp-customizer__choice-visual--step { box-shadow: inset 0 0 0 3px rgb(255 255 255 / 80%), inset 0 0 0 6px rgb(55 57 57 / 30%); }
+.jp-customizer--pro .jp-customizer__choice-visual--faceted { clip-path: polygon(10% 8%, 47% 0, 94% 8%, 100% 55%, 74% 100%, 18% 91%, 0 44%); }
+.jp-customizer--pro .jp-customizer__choice-visual--contour { box-shadow: inset 0 -8px 12px rgb(34 35 35 / 34%); }
+
+.jp-customizer--pro .jp-customizer__lens-options { gap: 8px; }
+.jp-customizer--pro .jp-customizer__lens-option { min-height: 72px; padding: 10px 12px; border-color: var(--studio-line); transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease; }
+.jp-customizer--pro .jp-customizer__lens-option:hover { background: #f8f5f0; transform: translateX(2px); }
+.jp-customizer--pro .jp-customizer__lens-option.is-selected { border-color: var(--studio-ink); background: #f1ede6; box-shadow: inset 0 0 0 1px var(--studio-ink); }
+.jp-customizer--pro .jp-customizer__lens-option strong { font-size: 13px; }
+.jp-customizer--pro .jp-customizer__lens-option small,
+.jp-customizer--pro .jp-customizer__lens-option em { display: block; margin-top: 3px; color: var(--studio-muted); font-size: 11px; font-style: normal; line-height: 1.3; }
+.jp-customizer--pro .jp-customizer__lens-option em { max-width: 35ch; }
+.jp-customizer--pro .jp-customizer__lens-price { margin-left: auto; color: var(--studio-accent); font-size: 12px; }
+
+.jp-customizer--pro .jp-customizer__protection-list { display: grid; gap: 7px; }
+.jp-customizer--pro .jp-customizer__protection { display: grid; grid-template-columns: 25px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 58px; padding: 9px 12px; border: 1px solid var(--studio-line); background: #fff; color: var(--studio-ink); cursor: pointer; text-align: left; transition: border-color 180ms ease, background-color 180ms ease; }
+.jp-customizer--pro .jp-customizer__protection:hover,
+.jp-customizer--pro .jp-customizer__protection.is-selected { border-color: var(--studio-ink); background: #f1ede6; }
+.jp-customizer--pro .jp-customizer__check { display: grid; width: 21px; height: 21px; place-items: center; border: 1px solid #bdb5a9; color: transparent; font-size: 12px; }
+.jp-customizer--pro .jp-customizer__protection.is-selected .jp-customizer__check { border-color: var(--studio-ink); background: var(--studio-ink); color: #fff; }
+.jp-customizer--pro .jp-customizer__protection strong,
+.jp-customizer--pro .jp-customizer__protection small { display: block; }
+.jp-customizer--pro .jp-customizer__protection strong { font-size: 12px; font-weight: 500; }
+.jp-customizer--pro .jp-customizer__protection small { margin-top: 3px; color: var(--studio-muted); font-size: 11px; }
+.jp-customizer--pro .jp-customizer__protection em { color: var(--studio-accent); font-size: 11px; font-style: normal; white-space: nowrap; }
+
+.jp-customizer--pro .jp-customizer__prescription { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; padding: 14px; background: #f1ede6; }
+.jp-customizer--pro .jp-customizer__prescription p { grid-column: 1 / -1; margin: 0; color: var(--studio-muted); font-size: 12px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
+
+.jp-customizer--pro .jp-customizer__engraving-field { display: block; margin-top: 12px; }
+.jp-customizer--pro .jp-customizer__engraving-field:first-of-type { margin-top: 0; }
+.jp-customizer--pro .jp-customizer__engraving-field > span { float: right; color: var(--studio-muted); font-size: 10px; letter-spacing: 0; text-transform: none; }
+.jp-customizer--pro .jp-customizer__engraving-field input,
+.jp-customizer--pro .jp-customizer__engraving-field select { display: block; width: 100%; }
+
+.jp-customizer--pro .jp-customizer__summary { margin-top: 30px; padding: 22px; background: var(--studio-ink); color: #fff; }
+.jp-customizer--pro .jp-customizer__summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.jp-customizer--pro .jp-customizer__summary-head span { color: #aaa49a; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
+.jp-customizer--pro .jp-customizer__summary-head h2 { max-width: 250px; margin: 9px 0 0; font-family: var(--font-display), Georgia, serif; font-size: 25px; font-weight: 400; letter-spacing: -.02em; line-height: 1.08; }
+.jp-customizer--pro .jp-customizer__summary-head > strong { font-family: var(--font-display), Georgia, serif; font-size: 24px; font-weight: 400; white-space: nowrap; }
+.jp-customizer--pro .jp-customizer__summary-lines { display: grid; gap: 8px; margin-top: 22px; padding-top: 18px; border-top: 1px solid rgb(255 255 255 / 18%); }
+.jp-customizer--pro .jp-customizer__summary-lines div { display: flex; justify-content: space-between; gap: 14px; color: #c5c0b8; font-size: 12px; }
+.jp-customizer--pro .jp-customizer__summary-lines strong { color: #fff; font-weight: 400; white-space: nowrap; }
+.jp-customizer--pro .jp-customizer__summary-note { margin: 18px 0 0; color: #aaa49a; font-size: 11px; line-height: 1.4; }
+
+.jp-customizer--pro .jp-customizer__actions { grid-template-columns: minmax(0, .8fr) minmax(0, .8fr) minmax(0, 1.35fr); gap: 8px; margin-top: 14px; }
+.jp-customizer--pro .jp-customizer__actions button { min-height: 54px; padding: 10px 12px; border: 1px solid var(--studio-ink); cursor: pointer; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; transition: background-color 180ms ease, color 180ms ease, transform 180ms ease; }
+.jp-customizer--pro .jp-customizer__actions button:hover { transform: translateY(-2px); }
+.jp-customizer--pro .jp-customizer__reset { border-color: var(--studio-line) !important; background: #fff; color: var(--studio-muted); }
+.jp-customizer--pro .jp-customizer__compare { background: #fff; color: var(--studio-ink); }
+.jp-customizer--pro .jp-customizer__add { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--studio-ink); color: #fff; }
+.jp-customizer--pro .jp-customizer__add span { font-family: var(--font-display), Georgia, serif; font-size: 18px; letter-spacing: 0; }
+.jp-customizer--pro .jp-customizer__actions button:disabled { cursor: not-allowed; opacity: .5; }
+
+.jp-customizer--pro .jp-customizer__comparison { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--studio-line); }
+.jp-customizer--pro .jp-customizer__comparison-grid { gap: 10px; }
+.jp-customizer--pro .jp-customizer__comparison-card { padding: 8px; border-color: var(--studio-line); background: #fff; }
+.jp-customizer--pro .jp-customizer__comparison-card strong { font-size: 12px; }
+.jp-customizer--pro .jp-customizer__comparison-card small { font-size: 11px; }
+.jp-customizer--pro .jp-customizer__remove { border-color: var(--studio-line); font-size: 10px; }
+
+.jp-customizer--pro .jp-customizer__choice:focus-visible,
+.jp-customizer--pro .jp-customizer__swatch-button:focus-visible,
+.jp-customizer--pro .jp-customizer__option:focus-visible,
+.jp-customizer--pro .jp-customizer__lens-option:focus-visible,
+.jp-customizer--pro .jp-customizer__protection:focus-visible,
+.jp-customizer--pro .jp-customizer__actions button:focus-visible,
+.jp-customizer--pro .jp-customizer__preview-controls button:focus-visible {
+  outline: 2px solid var(--studio-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1180px) {
+  .jp-customizer--pro .jp-customizer__layout { grid-template-columns: minmax(0, 1fr); }
+  .jp-customizer--pro .jp-customizer__visual { position: static; max-width: 760px; }
+}
+
+@media (max-width: 760px) {
+  .jp-customizer--pro .jp-customizer__head { align-items: flex-start; flex-direction: column; gap: 18px; }
+  .jp-customizer--pro .jp-customizer__head h1 { font-size: 43px; }
+  .jp-customizer--pro .jp-customizer__layout { gap: 34px; }
+  .jp-customizer--pro .jp-customizer__options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__shape-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__choice-grid--three { grid-template-columns: 1fr; }
+  .jp-customizer--pro .jp-customizer__corner-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__actions { grid-template-columns: 1fr 1fr; }
+  .jp-customizer--pro .jp-customizer__add { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .jp-customizer--pro .jp-customizer__head h1 { font-size: 38px; }
+  .jp-customizer--pro .jp-customizer__preview-hint { display: block; line-height: 1.55; }
+  .jp-customizer--pro .jp-customizer__preview-hint span { display: block; }
+  .jp-customizer--pro .jp-customizer__preview-controls { flex-wrap: wrap; }
+  .jp-customizer--pro .jp-customizer__preview-controls button:last-child { margin-left: auto; }
+  .jp-customizer--pro .jp-customizer__shape-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__corner-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jp-customizer--pro .jp-customizer__prescription { grid-template-columns: 1fr; }
+  .jp-customizer--pro .jp-customizer__summary { padding: 18px; }
+  .jp-customizer--pro .jp-customizer__summary-head { display: block; }
+  .jp-customizer--pro .jp-customizer__summary-head > strong { display: block; margin-top: 16px; }
+  .jp-customizer--pro .jp-customizer__actions { grid-template-columns: 1fr; }
+  .jp-customizer--pro .jp-customizer__add { grid-column: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jp-customizer--pro *,
+  .jp-customizer--pro *::before,
+  .jp-customizer--pro *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
+
 /* Product pages are enhanced from a static mirror. Keep the mirror hidden until
    the same boot pass has finished the live catalog and variant binding. */
 html:not(.jp-ui-ready) body:has(main section > div.mx-auto.mt-6.grid) {
@@ -4911,5 +5702,35 @@ button.jp-account-button {
   .jp-pdp-page *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Final customizer overrides after the mirrored page styles. */
+.jp-customizer--pro .jp-customizer__layout {
+  grid-template-columns: minmax(430px, .86fr) minmax(560px, 1.14fr);
+  gap: clamp(34px, 4vw, 52px);
+}
+
+.jp-customizer--pro .jp-customizer__stage {
+  border-color: #e7e0d6;
+  background: #f5f1ea;
+}
+
+.jp-customizer--pro .jp-customizer__option.is-selected,
+.jp-customizer--pro .jp-customizer__lens-option.is-selected,
+.jp-customizer--pro .jp-customizer__choice.is-selected,
+.jp-customizer--pro .jp-customizer__swatch-button.is-selected {
+  border-color: #b99448;
+  box-shadow: inset 0 0 0 1px #b99448;
+}
+
+.jp-customizer--pro .jp-customizer__option.is-selected .jp-customizer__swatch {
+  border-color: #b99448;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #b99448;
+}
+
+@media (max-width: 1180px) {
+  .jp-customizer--pro .jp-customizer__layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
