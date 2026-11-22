@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "./env";
 import { getCatalog } from "./catalog";
 import { getAdminClient } from "./supabase/admin";
+import { CUSTOMIZER_OPTIONS, type CustomizerOptions } from "./customizer-options";
 
 export type CustomizerFrame = {
   id: string;
@@ -42,6 +43,7 @@ export type CustomizerResponse = {
   frames: CustomizerFrame[];
   lenses: CustomizerLens[];
   compatibility: Record<string, string[]>;
+  options: CustomizerOptions;
 };
 
 type CatalogProduct = {
@@ -239,6 +241,7 @@ function staticCustomizer(catalog: { products: unknown[] }): CustomizerResponse 
     frames: staticFrames(catalog.products),
     lenses: DEFAULT_LENSES,
     compatibility: {},
+    options: CUSTOMIZER_OPTIONS,
   };
 }
 
@@ -318,6 +321,7 @@ async function supabaseCustomizer(): Promise<CustomizerResponse> {
     frames: frames.length ? frames : fallback.frames,
     lenses: lenses.length ? lenses : DEFAULT_LENSES,
     compatibility,
+    options: CUSTOMIZER_OPTIONS,
   };
 }
 

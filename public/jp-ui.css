@@ -1867,6 +1867,7 @@ body {
 }
 
 body.jp-customizer-page {
+  margin: 0;
   overflow-x: clip;
 }
 
@@ -1987,6 +1988,7 @@ body.jp-customizer-page {
 .jp-customizer-page__main {
   max-width: 1600px;
   margin: 0 auto;
+  overflow-x: clip;
   padding: 28px 54px 80px;
 }
 
@@ -5732,5 +5734,2021 @@ button.jp-account-button {
 @media (max-width: 1180px) {
   .jp-customizer--pro .jp-customizer__layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.jp-customizer--pro .jp-customizer__section[hidden] {
+  display: none !important;
+}
+
+.jp-customizer--pro .jp-customizer__section.is-active {
+  animation: jp-customizer-panel-in 220ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes jp-customizer-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-lens-design="diamond"] {
+  background: linear-gradient(125deg, rgb(255 255 255 / 22%), var(--lens-color) 38%, rgb(0 0 0 / 16%));
+  filter: contrast(1.08) saturate(1.12);
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-lens-cut="bevel"] {
+  filter: contrast(1.12) brightness(1.04);
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-lens-cut="step"] {
+  background: linear-gradient(90deg, rgb(255 255 255 / 18%), var(--lens-color) 28%, var(--lens-color) 72%, rgb(0 0 0 / 14%));
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-lens-cut="faceted"] {
+  background: linear-gradient(145deg, rgb(255 255 255 / 28%), var(--lens-color) 34%, var(--lens-color) 66%, rgb(0 0 0 / 18%));
+  filter: contrast(1.12) saturate(1.16);
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-lens-cut="contour"] {
+  filter: contrast(1.16) saturate(.92);
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-corners="crisp"],
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-corners="chiseled"] {
+  filter: contrast(1.14) saturate(.94);
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-protection~="blue-light"] {
+  background: linear-gradient(135deg, rgb(178 221 235 / 32%), var(--lens-color) 52%, rgb(255 255 255 / 12%));
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-protection~="polarized"] {
+  filter: contrast(1.2) saturate(.82);
+}
+
+.jp-customizer--pro .jp-customizer__image-tint[data-jp-protection~="anti-reflective"] {
+  opacity: calc(var(--lens-opacity) * .76);
+}
+
+@media (min-width: 1181px) {
+  .jp-customizer--pro .jp-customizer__controls {
+    position: sticky;
+    top: 104px;
+    align-self: start;
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+    scrollbar-color: #cbb98e transparent;
+    scrollbar-width: thin;
+  }
+
+  .jp-customizer--pro .jp-customizer__steps {
+    position: sticky;
+    z-index: 10;
+    top: 0;
+    padding-top: 2px;
+    background: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jp-customizer--pro .jp-customizer__section.is-active {
+    animation: none;
+  }
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-protection~="polarized"],
+.jp-customizer--pro .jp-customizer__lens-mask[data-jp-protection~="polarized"] {
+  filter: contrast(1.18) saturate(.84);
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-protection~="blue-light"],
+.jp-customizer--pro .jp-customizer__lens-mask[data-jp-protection~="blue-light"] {
+  filter: hue-rotate(8deg) saturate(1.08);
+}
+
+.jp-customizer--pro .jp-customizer__lens-layer[data-jp-protection~="anti-reflective"],
+.jp-customizer--pro .jp-customizer__lens-mask[data-jp-protection~="anti-reflective"] {
+  opacity: .78;
+}
+
+/* ------------------------------------------------------------------ */
+/* Atelier studio customizer                                          */
+/* ------------------------------------------------------------------ */
+
+.jp-studio {
+  --studio-ink: #171513;
+  --studio-muted: #6e6961;
+  --studio-line: #ded9d0;
+  --studio-paper: #fbfaf8;
+  --studio-panel: #f3f0ea;
+  --studio-accent: #a08358;
+  --studio-gold: #b79a58;
+  position: relative;
+  display: block;
+  padding-bottom: 40px;
+  color: var(--studio-ink);
+}
+
+.jp-studio *,
+.jp-studio *::before,
+.jp-studio *::after {
+  box-sizing: border-box;
+}
+
+.jp-studio h1,
+.jp-studio h2,
+.jp-studio p {
+  margin: 0;
+}
+
+.jp-studio button {
+  cursor: pointer;
+}
+
+.jp-studio :focus-visible {
+  outline: 2px solid var(--studio-accent);
+  outline-offset: 3px;
+}
+
+.jp-studio-loading {
+  display: grid;
+  min-height: 60vh;
+  place-items: center;
+  gap: 18px;
+  color: var(--studio-muted);
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+
+.jp-studio-loading span {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--studio-line);
+  border-top-color: var(--studio-accent);
+  border-radius: 50%;
+  animation: jp-studio-spin 1s linear infinite;
+}
+
+@keyframes jp-studio-spin {
+  to { transform: rotate(360deg); }
+}
+
+.jp-studio-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 30px;
+  padding: 8px 0 30px;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.jp-studio-head__copy {
+  max-width: 640px;
+}
+
+.jp-studio-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--studio-accent);
+  font-size: 10px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.jp-studio-eyebrow::before {
+  width: 26px;
+  height: 1px;
+  background: var(--studio-accent);
+  content: "";
+}
+
+.jp-studio-head h1 {
+  margin-top: 12px;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(38px, 5vw, 72px);
+  font-weight: 400;
+  letter-spacing: -.04em;
+  line-height: .95;
+}
+
+.jp-studio-head p {
+  max-width: 520px;
+  margin-top: 14px;
+  color: var(--studio-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.jp-studio-head__meta {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.jp-studio-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid var(--studio-line);
+  background: #fff;
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+}
+
+.jp-studio-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6e906e;
+  box-shadow: 0 0 0 4px #e4eee1;
+}
+
+.jp-studio-saved {
+  color: #8a847a;
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+
+.jp-studio-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(440px, .92fr);
+  gap: clamp(28px, 4vw, 64px);
+  align-items: start;
+}
+
+.jp-studio-visual {
+  position: sticky;
+  top: 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.jp-studio-visual__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.jp-studio-visual__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.jp-studio-visual__label span {
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.jp-studio-visual__label strong {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.jp-studio-visual__meta {
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.jp-studio-mount {
+  position: relative;
+}
+
+.jp-studio .jp-customizer__stage.jp-studio-stage {
+  position: relative;
+  aspect-ratio: 900 / 560;
+  min-height: 300px;
+  border: 1px solid var(--studio-line);
+  background:
+    radial-gradient(120% 90% at 50% 10%, #fdfbf7 0%, #f1ece2 55%, #e7e0d4 100%);
+  cursor: grab;
+  isolation: isolate;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.jp-studio .jp-customizer__stage.jp-studio-stage::after {
+  display: none;
+}
+
+.jp-studio .jp-customizer__stage.jp-studio-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.jp-studio-stage__wash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 50% 42%, rgb(255 255 255 / .65), transparent 70%);
+  pointer-events: none;
+}
+
+.jp-studio-scene {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  transform: perspective(1100px) rotateX(var(--preview-tilt)) rotateY(var(--preview-rotate)) scale(var(--preview-scale));
+  transform-style: preserve-3d;
+  transition: transform 360ms cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
+}
+
+.jp-studio-stage.is-dragging .jp-studio-scene {
+  transition: none;
+}
+
+.jp-studio-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 24px 30px rgb(50 38 24 / 10%));
+}
+
+.jp-studio-tools {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid rgb(255 255 255 / .6);
+  border-radius: 999px;
+  background: rgb(255 255 255 / .74);
+  box-shadow: 0 8px 24px rgb(33 28 20 / 10%);
+  backdrop-filter: blur(10px);
+}
+
+.jp-studio-tools button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--studio-ink);
+  transition: background .18s ease, transform .18s ease;
+}
+
+.jp-studio-tools button:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.jp-studio-tools svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.jp-studio-stage__hint {
+  position: absolute;
+  z-index: 2;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  gap: 12px;
+  color: #7b7469;
+  font-size: 9px;
+  letter-spacing: .14em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.jp-studio-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+  background: #f1ece2;
+}
+
+.jp-studio-stage:fullscreen .jp-studio-svg {
+  max-height: 100vh;
+}
+
+.jp-studio-visual__under {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.jp-studio-view {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jp-studio-view button {
+  display: inline-grid;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--studio-ink);
+  font-size: 13px;
+  transition: border-color .18s ease, background .18s ease;
+}
+
+.jp-studio-view button:hover {
+  border-color: var(--studio-accent);
+}
+
+.jp-studio-view span {
+  min-width: 52px;
+  color: var(--studio-muted);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-align: center;
+}
+
+.jp-studio-view__reset {
+  margin-left: auto;
+  font-size: 10px !important;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.jp-studio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jp-studio-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--studio-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--studio-ink);
+  transition: border-color .18s ease, transform .18s ease;
+}
+
+.jp-studio-chip:hover {
+  border-color: var(--studio-accent);
+  transform: translateY(-1px);
+}
+
+.jp-studio-chip span {
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.jp-studio-chip strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.jp-studio-visual__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--studio-line);
+}
+
+.jp-studio-visual__detail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.jp-studio-visual__detail > span {
+  font-size: 13px;
+}
+
+.jp-studio-visual__detail small {
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+
+.jp-studio-visual__foot > strong {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.jp-studio-controls {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.jp-studio-steps-wrap {
+  position: sticky;
+  z-index: 5;
+  top: 78px;
+  padding: 6px 0 14px;
+  background: linear-gradient(#fff 70%, rgb(255 255 255 / 0));
+}
+
+.jp-studio-steps {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 6px;
+  border: 1px solid var(--studio-line);
+  border-radius: 999px;
+  background: #fff;
+  scrollbar-width: none;
+}
+
+.jp-studio-steps::-webkit-scrollbar {
+  display: none;
+}
+
+.jp-studio-step {
+  position: relative;
+  display: inline-flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--studio-muted);
+  transition: background .2s ease, color .2s ease;
+  white-space: nowrap;
+}
+
+.jp-studio-step:hover {
+  background: var(--studio-panel);
+  color: var(--studio-ink);
+}
+
+.jp-studio-step.is-active {
+  background: var(--studio-ink);
+  color: #fff;
+}
+
+.jp-studio-step__icon {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+}
+
+.jp-studio-step__icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.jp-studio-step__label {
+  font-size: 11px;
+  letter-spacing: .08em;
+}
+
+.jp-studio-step__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--studio-accent);
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+
+.jp-studio-step.has-selection .jp-studio-step__dot {
+  opacity: 1;
+}
+
+.jp-studio-step.is-active .jp-studio-step__dot {
+  background: #fff;
+}
+
+.jp-studio-panels {
+  padding-top: 22px;
+}
+
+.jp-studio-panel[hidden] {
+  display: none;
+}
+
+.jp-studio-panel {
+  animation: jp-studio-rise .35s cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes jp-studio-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.jp-studio-panel__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.jp-studio-panel__head > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.jp-studio-panel__head span {
+  color: var(--studio-accent);
+  font-size: 10px;
+  letter-spacing: .2em;
+}
+
+.jp-studio-panel__head h2 {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: -.02em;
+}
+
+.jp-studio-panel__head small {
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.jp-studio-panel__lede {
+  max-width: 480px;
+  margin: 14px 0 20px;
+  color: var(--studio-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.jp-studio-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.jp-studio-filters label,
+.jp-studio-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.jp-studio-filters select,
+.jp-studio-field input,
+.jp-studio-field select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--studio-ink);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.jp-studio-field {
+  margin-bottom: 16px;
+}
+
+.jp-studio-field span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #8a847a;
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+
+.jp-studio-frame-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.jp-studio-frame {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.jp-studio-frame:hover {
+  border-color: #c9c1b4;
+  box-shadow: 0 10px 24px rgb(33 28 20 / 7%);
+  transform: translateY(-1px);
+}
+
+.jp-studio-frame.is-selected {
+  border-color: var(--studio-ink);
+  box-shadow: 0 0 0 1px var(--studio-ink) inset;
+}
+
+.jp-studio-frame__media {
+  display: grid;
+  width: 64px;
+  height: 52px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--studio-panel);
+}
+
+.jp-studio-frame__media img {
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: multiply;
+  object-fit: contain;
+}
+
+.jp-studio-frame__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.jp-studio-frame__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jp-studio-frame__meta {
+  overflow: hidden;
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.jp-studio-frame__price {
+  color: var(--studio-ink);
+  font-size: 12px;
+}
+
+.jp-studio-frame__swatch {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgb(0 0 0 / 10%);
+}
+
+.jp-studio-check {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--studio-ink);
+  color: #fff;
+  font-size: 9px;
+  opacity: 0;
+  transform: scale(.7);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.is-selected > .jp-studio-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.jp-studio-more {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px dashed #cfc7b9;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: border-color .2s ease, color .2s ease;
+}
+
+.jp-studio-more:hover {
+  border-color: var(--studio-accent);
+  color: var(--studio-ink);
+}
+
+.jp-studio-subhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 26px 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--studio-line);
+}
+
+.jp-studio-subhead span {
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.jp-studio-subhead small {
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.jp-studio-swatches,
+.jp-studio-swatches--lens {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.jp-studio-swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  transition: border-color .2s ease, transform .2s ease;
+}
+
+.jp-studio-swatch:hover {
+  border-color: #c9c1b4;
+  transform: translateY(-1px);
+}
+
+.jp-studio-swatch.is-selected {
+  border-color: var(--studio-ink);
+}
+
+.jp-studio-swatch__dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, var(--swatch-light), var(--swatch) 62%, rgb(0 0 0 / 28%));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.jp-studio-swatch__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.jp-studio-swatch__copy strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jp-studio-swatch__copy small {
+  color: var(--studio-muted);
+  font-size: 9px;
+}
+
+.jp-studio-swatch .jp-studio-check {
+  right: 6px;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
+}
+
+.jp-studio-lens-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jp-studio-lens {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--studio-line);
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  transition: border-color .2s ease, transform .2s ease;
+}
+
+.jp-studio-lens:hover {
+  border-color: #c9c1b4;
+  transform: translateY(-1px);
+}
+
+.jp-studio-lens.is-selected {
+  border-color: var(--studio-ink);
+  box-shadow: 0 0 0 1px var(--studio-ink) inset;
+}
+
+.jp-studio-lens__swatch {
+  width: 46px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, rgb(255 255 255 / .55), var(--swatch) 60%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%);
+  opacity: var(--swatch-opacity);
+}
+
+.jp-studio-lens__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jp-studio-lens__copy strong {
+  font-size: 13px;
+}
+
+.jp-studio-lens__copy small {
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.jp-studio-lens__copy em {
+  overflow: hidden;
+  color: #8a847a;
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jp-studio-lens__price {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.jp-studio-lens .jp-studio-check {
+  right: 10px;
+  bottom: 10px;
+}
+
+.jp-studio-choice-grid,
+.jp-studio-choice-grid--three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.jp-studio-choice-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.jp-studio-shape-grid,
+.jp-studio-corner-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.jp-studio-choice {
+  position: relative;
+  display: flex;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  transition: border-color .2s ease, transform .2s ease;
+}
+
+.jp-studio-choice:hover {
+  border-color: #c9c1b4;
+  transform: translateY(-1px);
+}
+
+.jp-studio-choice.is-selected {
+  border-color: var(--studio-ink);
+  box-shadow: 0 0 0 1px var(--studio-ink) inset;
+}
+
+.jp-studio-choice__glyph {
+  display: grid;
+  width: 100%;
+  height: 46px;
+  place-items: center;
+  color: var(--studio-ink);
+}
+
+.jp-studio-choice__glyph svg {
+  width: 100%;
+  height: 100%;
+  max-width: 82px;
+}
+
+.jp-studio-choice--lensType .jp-studio-choice__glyph svg {
+  width: 34px;
+  height: 34px;
+  stroke-width: 1.4;
+}
+
+.jp-studio-choice__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jp-studio-choice__copy strong {
+  font-size: 12px;
+}
+
+.jp-studio-choice__copy small {
+  color: var(--studio-muted);
+  font-size: 10px;
+}
+
+.jp-studio-choice__price {
+  margin-top: auto;
+  color: var(--studio-accent);
+  font-size: 11px;
+}
+
+.jp-studio-choice .jp-studio-check {
+  top: 8px;
+  right: 8px;
+  bottom: auto;
+}
+
+.jp-studio-shape-grid .jp-studio-choice,
+.jp-studio-corner-grid .jp-studio-choice {
+  min-height: 96px;
+}
+
+.jp-studio-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jp-studio-toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  transition: border-color .2s ease, background .2s ease;
+}
+
+.jp-studio-toggle:hover {
+  border-color: #c9c1b4;
+}
+
+.jp-studio-toggle.is-selected {
+  border-color: var(--studio-ink);
+  background: #fcfbf8;
+}
+
+.jp-studio-toggle__check {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  place-items: center;
+  border: 1px solid #cfc7b9;
+  border-radius: 5px;
+  color: transparent;
+  font-size: 11px;
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.jp-studio-toggle.is-selected .jp-studio-toggle__check {
+  border-color: var(--studio-ink);
+  background: var(--studio-ink);
+  color: #fff;
+}
+
+.jp-studio-toggle__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.jp-studio-toggle__copy strong {
+  font-size: 13px;
+}
+
+.jp-studio-toggle__copy small {
+  color: var(--studio-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.jp-studio-no-visual {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--studio-panel);
+  color: #8a847a;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.jp-studio-toggle__price {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.jp-studio-note {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--studio-accent);
+  background: #faf7f1;
+  color: var(--studio-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.jp-studio-rx {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: #fcfbf8;
+}
+
+.jp-studio-rx label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.jp-studio-rx input {
+  padding: 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.jp-studio-rx p {
+  grid-column: 1 / -1;
+  color: var(--studio-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.jp-studio-empty {
+  padding: 26px 18px;
+  border: 1px dashed #cfc7b9;
+  border-radius: 12px;
+  color: var(--studio-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.jp-studio-actions {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--studio-line);
+}
+
+.jp-studio-reset,
+.jp-studio-compare {
+  padding: 12px 14px;
+  border: 1px solid var(--studio-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--studio-muted);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: border-color .2s ease, color .2s ease;
+}
+
+.jp-studio-reset:hover,
+.jp-studio-compare:hover:not(:disabled) {
+  border-color: var(--studio-accent);
+  color: var(--studio-ink);
+}
+
+.jp-studio-compare:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.jp-studio-add {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--studio-ink);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  transition: background .2s ease, transform .2s ease;
+}
+
+.jp-studio-add:hover {
+  background: #2c2925;
+  transform: translateY(-1px);
+}
+
+.jp-studio-add span {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.jp-studio-order {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid var(--studio-line);
+  border-radius: 16px;
+  background: linear-gradient(160deg, #fcfbf8, #f4f0e8);
+}
+
+.jp-studio-order__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.jp-studio-order__head span {
+  color: var(--studio-accent);
+  font-size: 9px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.jp-studio-order__head h2 {
+  max-width: 320px;
+  margin-top: 5px;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.jp-studio-order__head > strong {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.jp-studio-order__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 0;
+}
+
+.jp-studio-order__lines > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.jp-studio-order__lines span {
+  color: var(--studio-muted);
+}
+
+.jp-studio-order__lines strong {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.jp-studio-order__note {
+  color: #8a847a;
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+
+.jp-studio-compare-list {
+  margin-top: 24px;
+}
+
+.jp-studio-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.jp-studio-compare-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.jp-studio-compare-visual {
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--studio-panel);
+}
+
+.jp-studio .jp-studio-compare-visual .jp-customizer__stage.jp-studio-stage {
+  min-height: 0;
+  aspect-ratio: 900 / 560;
+  border: 0;
+  background: var(--studio-panel);
+}
+
+.jp-studio-compare-visual .jp-studio-stage__hint,
+.jp-studio-compare-visual .jp-studio-tools {
+  display: none;
+}
+
+.jp-studio-compare-card > strong {
+  font-size: 12px;
+}
+
+.jp-studio-compare-card > small {
+  color: var(--studio-muted);
+  font-size: 10px;
+}
+
+.jp-studio-compare-remove {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / .85);
+  color: var(--studio-muted);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.jp-studio-compare-remove:hover {
+  color: var(--studio-ink);
+}
+
+.jp-studio-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .jp-studio-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-studio-visual {
+    position: static;
+    order: -1;
+  }
+
+  .jp-studio-steps-wrap {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .jp-studio-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .jp-studio-head__meta {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .jp-studio-frame-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-studio-shape-grid,
+  .jp-studio-corner-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .jp-studio-choice-grid,
+  .jp-studio-choice-grid--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jp-studio-swatches,
+  .jp-studio-swatches--lens {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jp-studio-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .jp-studio-add {
+    grid-column: 1 / -1;
+  }
+
+  .jp-studio-compare-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .jp-studio-head h1 {
+    font-size: clamp(34px, 11vw, 48px);
+  }
+
+  .jp-studio-visual__top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .jp-studio-visual__meta {
+    text-align: left;
+  }
+
+  .jp-studio .jp-customizer__stage.jp-studio-stage {
+    min-height: 230px;
+  }
+
+  .jp-studio-stage__hint {
+    display: none;
+  }
+
+  .jp-studio-tools {
+    top: 8px;
+    right: 8px;
+  }
+
+  .jp-studio-tools button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .jp-studio-shape-grid,
+  .jp-studio-corner-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jp-studio-choice-grid,
+  .jp-studio-choice-grid--two,
+  .jp-studio-choice-grid--three {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .jp-studio-swatches,
+  .jp-studio-swatches--lens {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .jp-studio-lens {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .jp-studio-lens__price {
+    grid-column: 2;
+  }
+
+  .jp-studio-lens .jp-studio-check {
+    top: 10px;
+    right: 10px;
+    bottom: auto;
+  }
+
+  .jp-studio-rx {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-studio-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-studio-reset,
+  .jp-studio-compare,
+  .jp-studio-add {
+    width: 100%;
+  }
+
+  .jp-studio-compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-studio-visual__foot {
+    align-items: flex-start;
+  }
+
+  .jp-studio-visual__foot > strong {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jp-studio *,
+  .jp-studio *::before,
+  .jp-studio *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* Final customization readability and action hierarchy pass. */
+.jp-studio-eyebrow,
+.jp-studio-live,
+.jp-studio-saved,
+.jp-studio-visual__label span,
+.jp-studio-visual__meta,
+.jp-studio-stage__hint,
+.jp-studio-chip span,
+.jp-studio-panel__head span,
+.jp-studio-panel__head small,
+.jp-studio-filters label,
+.jp-studio-field,
+.jp-studio-subhead span,
+.jp-studio-subhead small,
+.jp-studio-rx label,
+.jp-studio-order__head span,
+.jp-studio-no-visual {
+  font-size: 12px;
+}
+
+.jp-studio-head p,
+.jp-studio-panel__lede,
+.jp-studio-toggle__copy small,
+.jp-studio-rx p,
+.jp-studio-note,
+.jp-studio-order__note,
+.jp-studio-empty {
+  font-size: 13px;
+}
+
+.jp-studio-step__label,
+.jp-studio-view span,
+.jp-studio-chip strong,
+.jp-studio-frame__meta,
+.jp-studio-swatch__copy small,
+.jp-studio-lens__copy small,
+.jp-studio-choice__copy small,
+.jp-studio-field span,
+.jp-studio-compare-card > small,
+.jp-studio-toggle__price,
+.jp-studio-lens__price,
+.jp-studio-choice__price,
+.jp-studio-frame__price {
+  font-size: 12px;
+}
+
+.jp-studio-visual__detail > span,
+.jp-studio-visual__detail small,
+.jp-studio-frame__name,
+.jp-studio-swatch__copy strong,
+.jp-studio-lens__copy strong,
+.jp-studio-lens__copy em,
+.jp-studio-choice__copy strong,
+.jp-studio-toggle__copy strong,
+.jp-studio-order__lines > div,
+.jp-studio-compare-card > strong {
+  font-size: 14px;
+}
+
+.jp-studio-filters select,
+.jp-studio-field input,
+.jp-studio-field select,
+.jp-studio-rx input {
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.jp-studio-frame,
+.jp-studio-lens,
+.jp-studio-toggle,
+.jp-studio-choice,
+.jp-studio-swatch {
+  min-height: 48px;
+}
+
+.jp-studio-actions {
+  align-items: stretch;
+  gap: 12px;
+}
+
+.jp-studio-reset,
+.jp-studio-compare {
+  min-height: 64px;
+  padding: 14px 18px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.jp-studio-add {
+  min-height: 64px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+  letter-spacing: .12em;
+}
+
+.jp-studio-add span {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.jp-studio-frame__name,
+.jp-studio-lens__copy strong,
+.jp-studio-choice__copy strong,
+.jp-studio-toggle__copy strong,
+.jp-studio-swatch__copy strong {
+  line-height: 1.3;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+@media (max-width: 900px) {
+  .jp-studio-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .jp-studio-add {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .jp-studio-layout {
+    gap: 24px;
+  }
+
+  .jp-studio-head {
+    margin-bottom: 20px;
+  }
+
+  .jp-studio-head p {
+    font-size: 15px;
+  }
+
+  .jp-studio-head__meta {
+    width: 100%;
+  }
+
+  .jp-studio-live,
+  .jp-studio-saved {
+    font-size: 11px;
+  }
+
+  .jp-studio-steps {
+    padding: 4px;
+  }
+
+  .jp-studio-step {
+    min-height: 48px;
+    padding: 10px 12px;
+  }
+
+  .jp-studio-step__label {
+    font-size: 12px;
+  }
+
+  .jp-studio-frame-grid,
+  .jp-studio-choice-grid,
+  .jp-studio-choice-grid--two,
+  .jp-studio-choice-grid--three,
+  .jp-studio-shape-grid,
+  .jp-studio-corner-grid,
+  .jp-studio-swatches,
+  .jp-studio-swatches--lens {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jp-studio-choice {
+    min-height: 112px;
+  }
+
+  .jp-studio-toggle {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .jp-studio-toggle__price {
+    grid-column: 2;
+  }
+
+  .jp-studio-actions {
+    position: sticky;
+    z-index: 20;
+    bottom: 0;
+    grid-template-columns: 1fr 1fr;
+    margin-right: -16px;
+    margin-left: -16px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--studio-line);
+    background: rgb(255 255 255 / 96%);
+    box-shadow: 0 -10px 24px rgb(33 28 20 / 8%);
+    backdrop-filter: blur(10px);
+  }
+
+  .jp-studio-add {
+    grid-column: 1 / -1;
+  }
+
+  .jp-studio-reset,
+  .jp-studio-compare,
+  .jp-studio-add {
+    min-height: 56px;
+  }
+
+  .jp-studio-add {
+    min-height: 64px;
+  }
+
+  .jp-studio-add span {
+    font-size: 17px;
+  }
+
+  .jp-studio-visual__foot {
+    gap: 10px;
+  }
+
+  .jp-studio-visual__foot > strong {
+    font-size: 21px;
+  }
+}
+
+/* Keep the action hierarchy readable at every control-column width. */
+.jp-studio-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.jp-studio-reset,
+.jp-studio-compare,
+.jp-studio-add {
+  min-width: 0;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+.jp-studio-reset,
+.jp-studio-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 12px;
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+
+.jp-studio-add {
+  grid-column: 1 / -1;
+  width: 100%;
+  justify-self: stretch;
+}
+
+.jp-studio-add span {
+  flex: none;
+}
+
+.jp-studio-reset:active,
+.jp-studio-compare:active,
+.jp-studio-add:active {
+  transform: scale(.99);
+}
+
+@media (max-width: 640px) {
+  .jp-studio-reset,
+  .jp-studio-compare {
+    font-size: 11px;
+    letter-spacing: .08em;
+  }
+}
+
+@media (max-width: 480px) {
+  .jp-studio-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-studio-add {
+    grid-column: auto;
+  }
+}
+
+/* Final type scale for utility copy that needs to remain legible at a glance. */
+.jp-studio-loading {
+  font-size: 13px;
+}
+
+.jp-studio-eyebrow,
+.jp-studio-live,
+.jp-studio-saved,
+.jp-studio-visual__label span,
+.jp-studio-visual__meta,
+.jp-studio-stage__hint,
+.jp-studio-chip span,
+.jp-studio-panel__head span,
+.jp-studio-panel__head small,
+.jp-studio-filters label,
+.jp-studio-field,
+.jp-studio-subhead span,
+.jp-studio-subhead small,
+.jp-studio-rx label,
+.jp-studio-order__head span,
+.jp-studio-no-visual {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.jp-studio-head p,
+.jp-studio-panel__lede,
+.jp-studio-toggle__copy small,
+.jp-studio-rx p,
+.jp-studio-note,
+.jp-studio-order__note,
+.jp-studio-empty {
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.jp-studio-step__label,
+.jp-studio-view span,
+.jp-studio-chip strong,
+.jp-studio-frame__meta,
+.jp-studio-frame__price,
+.jp-studio-swatch__copy small,
+.jp-studio-lens__copy small,
+.jp-studio-choice__copy small,
+.jp-studio-field span,
+.jp-studio-compare-card > small,
+.jp-studio-toggle__price,
+.jp-studio-lens__price,
+.jp-studio-choice__price {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.jp-studio-visual__detail > span,
+.jp-studio-visual__detail small,
+.jp-studio-frame__name,
+.jp-studio-swatch__copy strong,
+.jp-studio-lens__copy strong,
+.jp-studio-lens__copy em,
+.jp-studio-choice__copy strong,
+.jp-studio-toggle__copy strong,
+.jp-studio-order__lines > div,
+.jp-studio-compare-card > strong {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.jp-studio-filters select,
+.jp-studio-field input,
+.jp-studio-field select,
+.jp-studio-rx input {
+  font-size: 16px;
+}
+
+.jp-studio-view__reset,
+.jp-studio-more,
+.jp-studio-compare-remove {
+  font-size: 13px !important;
+}
+
+.jp-studio-reset,
+.jp-studio-compare {
+  font-size: 13px;
+}
+
+.jp-studio-add {
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .jp-studio-head p {
+    font-size: 16px;
+  }
+
+  .jp-studio-reset,
+  .jp-studio-compare {
+    font-size: 13px;
   }
 }

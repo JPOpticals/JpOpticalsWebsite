@@ -955,10 +955,15 @@
     };
     const legacyLensColor = normalize(customization.lensColor);
     const frame = {
+      id: customization.frameId || customization.frameName || "selected-frame",
       name: customization.frameName || item.name || "Selected frame",
       imageUrl: customization.frameImageUrl || item.image || null,
       lensMaskUrl: customization.frameLensMaskUrl || null,
       style: customization.frameStyle || "Classic",
+      frameType: customization.frameType || "Eyewear",
+      material: customization.frameMaterial || "",
+      color: customization.frameColor || "",
+      colorCode: customization.frameColorCode || "",
       metadata: customization.frameMetadata || null,
     };
     const lens = {
@@ -1148,25 +1153,462 @@
   const customizerSlug = (value) =>
     normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "default";
 
-  const customizerPreviewPro = (frame, lens, settings = {}, compact = false) => {
-    const frameImageUrl = customizerAssetUrl(frame?.imageUrl) || "/mirror-assets/placeholder.svg";
-    const geometry = customizerPreviewGeometry(frame);
-    const lensColor = customizerColor(settings.lensColorCode || lens?.colorCode, "#e8eef1");
-    const lensOpacity = Math.min(0.82, Math.max(0.12, Number(settings.lensOpacity || lens?.tintOpacity) || 0.2));
-    const lensMaskUrl = customizerAssetUrl(frame?.lensMaskUrl);
+  let customizerStudioPreviewSeq = 0;
+
+  const customizerStudioClamp = (value, minimum, maximum) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return minimum;
+    return Math.min(maximum, Math.max(minimum, number));
+  };
+
+  const customizerStudioFrameColors = {
+    black: "#232220",
+    jet: "#1b1a18",
+    grey: "#6f7377",
+    gray: "#6f7377",
+    graphite: "#44484b",
+    silver: "#b9bdc1",
+    chrome: "#c8ccd0",
+    gold: "#c7a44c",
+    rose: "#c78f80",
+    "rose gold": "#c78f80",
+    brown: "#6b4a32",
+    tortoise: "#6b4a32",
+    havana: "#7a5335",
+    amber: "#b9834f",
+    blue: "#30496b",
+    navy: "#25344d",
+    green: "#4b6350",
+    olive: "#65715d",
+    red: "#8c3434",
+    burgundy: "#6b2b35",
+    violet: "#6d3a72",
+    purple: "#5d3a6e",
+    pink: "#c08a94",
+    crystal: "#d8d2c6",
+    clear: "#d8d2c6",
+    transparent: "#d8d2c6",
+    white: "#e8e4dc",
+    cream: "#e3dccd",
+    beige: "#cbbda4",
+    orange: "#b86a3c",
+  };
+
+  const customizerStudioHex = (value, fallback = "#2a2723") => {
+    const raw = String(value || "").trim();
+    if (/^#[0-9a-f]{3,8}$/i.test(raw)) return raw;
+    const key = normalize(raw).replace(/[^a-z0-9]+/g, " ").trim();
+    if (customizerStudioFrameColors[key]) return customizerStudioFrameColors[key];
+    for (const [name, hex] of Object.entries(customizerStudioFrameColors)) {
+      if (name.includes(" ") ? key.includes(name) : key === name) return hex;
+    }
+    for (const [name, hex] of Object.entries(customizerStudioFrameColors)) {
+      if (key.includes(name)) return hex;
+    }
+    return fallback;
+  };
+
+  const customizerStudioRgb = (value) => {
+    const raw = String(value || "").trim();
+    const short = raw.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+    const full = raw.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
+    const match = short || full;
+    if (!match) return null;
+    if (short) {
+      return [1, 2, 3].map((index) => parseInt(match[index] + match[index], 16));
+    }
+    return [1, 2, 3].map((index) => parseInt(match[index], 16));
+  };
+
+  const customizerStudioMix = (value, target, amount) => {
+    const source = customizerStudioRgb(value);
+    const destination = customizerStudioRgb(target);
+    if (!source || !destination) return value;
+    const ratio = customizerStudioClamp(amount, 0, 1);
+    return `#${source
+      .map((channel, index) =>
+        Math.round(channel + (destination[index] - channel) * ratio)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")}`;
+  };
+
+  const customizerStudioHash = (value) => {
+    let hash = 2166136261;
+    const text = String(value || "");
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return Math.abs(hash);
+  };
+
+  const customizerStudioShapePresets = {
+    "soft-square": { n: 3, width: 216, height: 158 },
+    round: { n: 2, width: 198, height: 158 },
+    oval: { n: 2, width: 220, height: 142 },
+    rectangle: { n: 6.4, width: 222, height: 142 },
+    "cat-eye": { n: 2.8, width: 224, height: 160, catEye: true },
+    aviator: { n: 2.6, width: 212, height: 170, aviator: true },
+    butterfly: { n: 2.5, width: 230, height: 166, butterfly: true },
+    wayfarer: { n: 4.2, width: 222, height: 150, wayfarer: true },
+    hexagon: { n: 3.4, width: 212, height: 160, hexagon: true },
+    geometric: { n: 2.7, width: 218, height: 160, geometric: true },
+    shield: { n: 3.6, width: 238, height: 164, shield: true },
+    diamond: { n: 1.42, width: 208, height: 166 },
+  };
+
+  const customizerStudioCornerPresets = {
+    soft: { softness: 1, edge: 1 },
+    rounded: { softness: 0.78, edge: 0.95 },
+    crisp: { softness: 1.45, edge: 1.05 },
+    chiseled: { softness: 1.8, edge: 1.09 },
+    micro: { softness: 2.2, edge: 1.12 },
+    exaggerated: { softness: 0.6, edge: 0.92 },
+    sculpted: { softness: 1.12, edge: 1.02 },
+    crown: { softness: 0.86, edge: 0.98, crown: true },
+  };
+
+  const customizerStudioSmoothPath = (points) => {
+    if (!Array.isArray(points) || points.length < 3) return "";
+    const total = points.length;
+    let path = `M ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
+    for (let index = 0; index < total; index += 1) {
+      const previous = points[(index - 1 + total) % total];
+      const current = points[index];
+      const next = points[(index + 1) % total];
+      const following = points[(index + 2) % total];
+      const controlOneX = current[0] + (next[0] - previous[0]) / 6;
+      const controlOneY = current[1] + (next[1] - previous[1]) / 6;
+      const controlTwoX = next[0] - (following[0] - current[0]) / 6;
+      const controlTwoY = next[1] - (following[1] - current[1]) / 6;
+      path += ` C ${controlOneX.toFixed(2)} ${controlOneY.toFixed(2)}, ${controlTwoX.toFixed(2)} ${controlTwoY.toFixed(2)}, ${next[0].toFixed(2)} ${next[1].toFixed(2)}`;
+    }
+    return `${path} Z`;
+  };
+
+  const customizerStudioLensGeometry = (shape, corner) => {
+    const preset = customizerStudioShapePresets[shape] || customizerStudioShapePresets["soft-square"];
+    const cornerPreset = customizerStudioCornerPresets[corner] || customizerStudioCornerPresets.soft;
+    const exponent = customizerStudioClamp(2 + (preset.n - 2) * cornerPreset.softness, 1.2, 9);
+    const edge = customizerStudioClamp(cornerPreset.edge, 0.82, 1.24);
+    const total = 76;
+    const points = [];
+    for (let index = 0; index < total; index += 1) {
+      const angle = (index / total) * Math.PI * 2;
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      let x = Math.sign(cosine) * Math.pow(Math.abs(cosine), 2 / exponent);
+      let y = Math.sign(sine) * Math.pow(Math.abs(sine), 2 / exponent);
+      x = Math.sign(x) * Math.pow(Math.abs(x), edge);
+      y = Math.sign(y) * Math.pow(Math.abs(y), edge);
+      if (preset.catEye) {
+        y -= 0.2 * Math.max(0, x) * Math.max(0, -y);
+        x *= 1 + 0.035 * Math.max(0, -y);
+      }
+      if (preset.aviator) {
+        x *= 1 - 0.17 * Math.max(0, y);
+        y += 0.035 * Math.max(0, -y);
+      }
+      if (preset.butterfly) {
+        y -= 0.24 * Math.max(0, x) * Math.max(0, -y);
+        x *= 1 + 0.05 * Math.max(0, -y);
+      }
+      if (preset.wayfarer) {
+        x *= 1 - 0.2 * Math.max(0, y);
+        x *= 1 + 0.035 * Math.max(0, -y);
+      }
+      if (preset.hexagon) {
+        y = Math.sign(y) * Math.min(1, Math.abs(y) * 1.12);
+      }
+      if (preset.geometric) {
+        y += 0.07 * x * Math.sign(y || 1);
+      }
+      if (preset.shield) {
+        x *= 1 - 0.24 * Math.max(0, y);
+        y += 0.025 * Math.max(0, -y);
+      }
+      if (cornerPreset.crown) {
+        y -= 0.06 * Math.max(0, 1 - Math.abs(x) / 0.45) * Math.max(0, -y);
+      }
+      points.push([x * preset.width * 0.5, y * preset.height * 0.5]);
+    }
+    return {
+      d: customizerStudioSmoothPath(points),
+      width: preset.width,
+      height: preset.height,
+    };
+  };
+
+  const customizerStudioFrameLook = (frame, finishId) => {
+    const hash = customizerStudioHash(frame?.id || frame?.name || "jp-frame");
+    const code = String(frame?.colorCode || "").trim();
+    const base = /^#[0-9a-f]{3,8}$/i.test(code)
+      ? code
+      : customizerStudioHex(frame?.color, "#2a2723");
+    const finishes = {
+      silver: "#c9cdd0",
+      gold: "#c8a64b",
+      gunmetal: "#4d5153",
+      "rose-gold": "#c58f82",
+      crystal: "#d9d4c9",
+    };
+    const color = finishes[finishId] || base;
+    const material = normalize(frame?.material);
+    const metal = /metal|titanium|steel|aluminum|alloy|gold|silver/.test(material);
+    const acetate = /acetate|plastic|bio|nylon/.test(material);
+    const sunglasses = /sunglass/.test(normalize(frame?.frameType));
+    return {
+      color,
+      light: customizerStudioMix(color, "#ffffff", metal ? 0.42 : 0.3),
+      dark: customizerStudioMix(color, "#000000", metal ? 0.34 : 0.42),
+      rim: metal ? 5.4 : acetate ? 12.5 : 8.5,
+      temple: metal ? 5.2 : acetate ? 11 : 7.5,
+      templeStyle: hash % 3,
+      bridgeStyle: Math.floor(hash / 7) % 3,
+      scale: 0.972 + (hash % 5) * 0.011,
+      metal,
+      sunglasses,
+    };
+  };
+
+  const customizerStudioSvg = (frame, lens, settings = {}) => {
+    const uid = `jpcs${++customizerStudioPreviewSeq}`;
     const shape = customizerSlug(settings.lensShape || customizerStyle(frame?.style));
+    const corner = customizerSlug(settings.cornerStyle || "soft");
     const design = customizerSlug(settings.lensDesign || "regular");
     const cut = customizerSlug(settings.lensCut || "classic");
-    const corners = customizerSlug(settings.cornerStyle || "soft");
+    const rawProtection = Array.isArray(settings.protectionIds)
+      ? settings.protectionIds
+      : Array.isArray(settings.protections)
+        ? settings.protections
+        : [];
+    const protectionIds = rawProtection.map((value) => {
+      const slug = customizerSlug(value);
+      if (slug === "uv-protection") return "uv";
+      if (slug === "blue-light-filter") return "blue-light";
+      if (slug === "scratch-resistant") return "scratch-resistant";
+      return slug;
+    });
+    const hasProtection = (id) => protectionIds.includes(id);
+    const finishId = customizerSlug(settings.frameFinishId || settings.frameFinish || "original");
+    const look = customizerStudioFrameLook(frame, finishId);
+    const geometry = customizerStudioLensGeometry(shape, corner);
+    const lensColor = customizerStudioHex(settings.lensColorCode || lens?.colorCode, "#8fa6a2");
+    const lensOpacity = customizerStudioClamp(
+      Number(settings.lensOpacity || lens?.tintOpacity) || 0.2,
+      0.12,
+      0.82,
+    );
+    const fillOpacity = customizerStudioClamp(lensOpacity * 0.95 + 0.08, 0.18, 0.9);
+    const { d, width, height } = geometry;
+    const gap = 34;
+    const cxLeft = 450 - gap / 2 - width / 2;
+    const cxRight = 450 + gap / 2 + width / 2;
+    const cy = 296;
+    const outerLeft = cxLeft - width / 2;
+    const outerRight = cxRight + width / 2;
+    const innerLeft = cxLeft + width / 2;
+    const innerRight = cxRight - width / 2;
+    const middle = (innerLeft + innerRight) / 2;
+    const templeStart = cy - height * 0.22;
+    const bridgeY = cy - height * 0.4;
+    const bridgeDip = look.bridgeStyle === 0 ? -8 : look.bridgeStyle === 1 ? 10 : 0;
     const engraving = String(settings.engraving || "").trim().slice(0, 16);
     const engravingPosition = customizerSlug(settings.engravingPosition || "temple");
-    const previewOpacity = geometry || lensMaskUrl ? lensOpacity : Math.min(0.34, Math.max(0.18, lensOpacity));
-    const lensLayer = lensMaskUrl
-      ? `<div class="jp-customizer__lens-mask" data-jp-lens-mask-url="${escapeHtml(lensMaskUrl)}" aria-hidden="true"></div>`
-      : geometry
-        ? `<div class="jp-customizer__lens-layer jp-customizer__lens-layer--${shape}" data-jp-lens-design="${design}" data-jp-lens-cut="${cut}" data-jp-corners="${corners}" aria-hidden="true"><span style="--pane-x:${geometry.left.x}%;--pane-y:${geometry.left.y}%;--pane-width:${geometry.left.width}%;--pane-height:${geometry.left.height}%;--pane-rotate:${geometry.left.rotate}deg"></span><span style="--pane-x:${geometry.right.x}%;--pane-y:${geometry.right.y}%;--pane-width:${geometry.right.width}%;--pane-height:${geometry.right.height}%;--pane-rotate:${geometry.right.rotate}deg"></span></div>`
-        : `<div class="jp-customizer__image-tint" data-jp-frame-image-url="${escapeHtml(frameImageUrl)}" aria-hidden="true"></div>`;
-    return `<div class="jp-customizer__stage${compact ? " is-compact" : ""}" data-jp-preview-stage style="--lens-color:${lensColor};--lens-opacity:${previewOpacity}"><div class="jp-customizer__stage-tools" aria-label="Preview controls"><button type="button" data-jp-preview-action="reset" aria-label="Reset preview angle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5.3"/><path d="M4 4v4h4"/></svg></button><button type="button" data-jp-preview-action="zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M8 11h6M16 16l4 4"/></svg></button><button type="button" data-jp-preview-action="zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M8 11h6M11 8v6M16 16l4 4"/></svg></button><button type="button" data-jp-preview-action="fullscreen" aria-label="Open preview fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"/></svg></button></div><div class="jp-customizer__preview-scene" data-jp-preview-scene style="--preview-rotate:${Number(settings.viewRotation || 0)}deg;--preview-tilt:${Number(settings.viewTilt || 0)}deg;--preview-scale:${Number(settings.viewZoom || 1)}"><div class="jp-customizer__artboard" data-jp-frame-finish="${customizerSlug(settings.frameFinish || "original")}"><div class="jp-customizer__frame-finish-layer" data-jp-frame-image-url="${escapeHtml(frameImageUrl)}" aria-hidden="true"></div><img src="${escapeHtml(frameImageUrl)}" alt="${escapeHtml(frame?.name || "JP frame")} with ${escapeHtml(lens?.name || "selected lens")}" loading="${compact ? "lazy" : "eager"}">${lensLayer}<div class="jp-customizer__engraving jp-customizer__engraving--${engravingPosition}${engraving ? " has-text" : ""}" aria-hidden="true"><span data-jp-live-engraving>${escapeHtml(engraving)}</span></div></div></div></div>`;
+    const lensType = customizerSlug(settings.lensType || "non-prescription");
+    const badge = lensType === "prescription" ? "Rx" : lensType === "readers" ? "R" : "";
+    const shapeName = settings.lensShapeName || shape;
+    const colorName = settings.lensColorName || lens?.color || "tinted";
+    const aria = `${frame?.name || "JP frame"} with ${lens?.name || "selected lenses"}, ${shapeName} shape and ${colorName} lenses`;
+
+    const templePath = (side) => {
+      const outer = side === "left" ? outerLeft : outerRight;
+      const direction = side === "left" ? -1 : 1;
+      const endX = 450 + direction * 376;
+      const tipX = 450 + direction * 400;
+      return `M ${outer.toFixed(1)} ${templeStart.toFixed(1)} C ${(outer + direction * 54).toFixed(1)} ${(templeStart - 24).toFixed(1)}, ${(outer + direction * 118).toFixed(1)} ${(cy - 64).toFixed(1)}, ${endX.toFixed(1)} ${(cy - 42).toFixed(1)} C ${tipX.toFixed(1)} ${(cy - 26).toFixed(1)}, ${tipX.toFixed(1)} ${(cy + 22).toFixed(1)}, ${(endX + direction * 22).toFixed(1)} ${(cy + 34).toFixed(1)}`;
+    };
+
+    const templeDetail = (side) => {
+      const outer = side === "left" ? outerLeft : outerRight;
+      const direction = side === "left" ? -1 : 1;
+      const endX = 450 + direction * 376;
+      const endY = cy - 42;
+      if (look.templeStyle === 1) {
+        return Array.from({ length: 7 }, (_, index) => {
+          const t = (index + 1) / 8;
+          const x = outer + (endX - outer) * t;
+          const y = templeStart + (endY - templeStart) * t - Math.sin(t * Math.PI) * 8;
+          return `<line x1="${x.toFixed(1)}" y1="${(y - 5).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y + 5).toFixed(1)}" stroke="${look.dark}" stroke-width="1.6" opacity=".55"/>`;
+        }).join("");
+      }
+      if (look.templeStyle === 2) {
+        return Array.from({ length: 5 }, (_, index) => {
+          const t = (index + 1) / 6;
+          const x = outer + (endX - outer) * t;
+          const y = templeStart + (endY - templeStart) * t - Math.sin(t * Math.PI) * 8;
+          return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="none" stroke="${look.light}" stroke-width="1.2" opacity=".7"/>`;
+        }).join("");
+      }
+      return "";
+    };
+
+    const lensMarkup = (side) => {
+      const cx = side === "left" ? cxLeft : cxRight;
+      const transform = side === "left" ? `translate(${cx.toFixed(2)} ${cy})` : `translate(${cx.toFixed(2)} ${cy}) scale(-1 1)`;
+      const clipId = `${uid}-${side}`;
+      const designMarkup =
+        design === "diamond"
+          ? `<g fill="none" stroke="rgba(255,255,255,.62)" stroke-width="1.2">
+              <path d="M 0 ${-height / 2} L ${width / 2} 0 L 0 ${height / 2} L ${-width / 2} 0 Z"/>
+              <path d="M 0 ${-height / 2} L 0 ${height / 2} M ${-width / 2} 0 L ${width / 2} 0"/>
+              <path d="M ${-width / 4} ${-height / 4} L ${width / 4} ${height / 4} M ${width / 4} ${-height / 4} L ${-width / 4} ${height / 4}" opacity=".55"/>
+            </g>`
+          : "";
+      const inset = (scale, opacity, strokeWidth) =>
+        `<path d="${d}" transform="scale(${scale})" fill="none" stroke="rgba(255,255,255,${opacity})" stroke-width="${strokeWidth}"/>`;
+      let cutMarkup = "";
+      if (cut === "bevel") cutMarkup = inset(0.92, 0.6, 2.2);
+      if (cut === "step") cutMarkup = inset(0.92, 0.55, 2) + inset(0.84, 0.35, 1.5);
+      if (cut === "faceted") {
+        cutMarkup =
+          inset(0.9, 0.5, 1.8) +
+          `<path d="M 0 ${-height / 2} L ${width / 2} ${height / 6} L 0 ${height / 2} L ${-width / 2} ${height / 6} Z" fill="none" stroke="rgba(255,255,255,.42)" stroke-width="1.2"/>`;
+      }
+      if (cut === "contour") {
+        cutMarkup =
+          inset(0.88, 0.45, 3) +
+          `<path d="${d}" transform="scale(.84)" fill="none" stroke="rgba(0,0,0,.2)" stroke-width="4"/>`;
+      }
+      let protectionMarkup = "";
+      if (hasProtection("polarized")) {
+        protectionMarkup += `<rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" fill="url(#${uid}-polarized)" opacity=".3"/>`;
+      }
+      if (hasProtection("blue-light")) {
+        protectionMarkup += `<rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" fill="url(#${uid}-blue)" opacity=".6"/>`;
+      }
+      if (hasProtection("anti-reflective")) {
+        protectionMarkup += `<rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" fill="url(#${uid}-ar)" opacity=".45"/>`;
+      }
+      return `<g transform="${transform}">
+        <clipPath id="${clipId}"><path d="${d}"/></clipPath>
+        <path d="${d}" fill="url(#${uid}-lens)" opacity="${fillOpacity.toFixed(3)}"/>
+        <g clip-path="url(#${clipId})">
+          <path d="${d}" fill="url(#${uid}-sheen)" opacity=".62"/>
+          ${protectionMarkup}
+          ${designMarkup}
+          ${cutMarkup}
+        </g>
+        <path d="${d}" fill="none" stroke="${look.dark}" stroke-width="${(look.rim * 2 + 2).toFixed(1)}" opacity=".42"/>
+        <path d="${d}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${(look.rim * 2).toFixed(1)}"/>
+        <path d="${d}" fill="none" stroke="${look.light}" stroke-width="1.1" opacity=".55"/>
+      </g>`;
+    };
+
+    const bridgePath = `M ${innerLeft.toFixed(1)} ${bridgeY.toFixed(1)} C ${(innerLeft + 10).toFixed(1)} ${(bridgeY - 14).toFixed(1)}, ${(middle - 8).toFixed(1)} ${(bridgeY + bridgeDip).toFixed(1)}, ${middle.toFixed(1)} ${(bridgeY + bridgeDip).toFixed(1)} C ${(middle + 8).toFixed(1)} ${(bridgeY + bridgeDip).toFixed(1)}, ${(innerRight - 10).toFixed(1)} ${(bridgeY - 14).toFixed(1)}, ${innerRight.toFixed(1)} ${bridgeY.toFixed(1)}`;
+    const browPath = look.sunglasses
+      ? `<path d="M ${(outerLeft - 2).toFixed(1)} ${(cy - height * 0.52).toFixed(1)} Q 450 ${(cy - height * 0.68).toFixed(1)}, ${(outerRight + 2).toFixed(1)} ${(cy - height * 0.52).toFixed(1)}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${(look.rim * 1.25).toFixed(1)}" stroke-linecap="round" opacity=".95"/>`
+      : "";
+    const nosePads = look.metal
+      ? `<ellipse cx="${(middle - 14).toFixed(1)}" cy="${(bridgeY + 18).toFixed(1)}" rx="4" ry="7" fill="${look.light}" opacity=".72"/><ellipse cx="${(middle + 14).toFixed(1)}" cy="${(bridgeY + 18).toFixed(1)}" rx="4" ry="7" fill="${look.light}" opacity=".72"/>`
+      : "";
+    const badgeMarkup = badge
+      ? `<text x="${(cxRight + width / 2 - 24).toFixed(1)}" y="${(cy + height / 2 - 14).toFixed(1)}" text-anchor="middle" fill="#f7efe0" opacity=".85" font-size="10" font-family="Georgia, serif" letter-spacing="1">${badge}</text>`
+      : "";
+    const engravingAnchor =
+      engravingPosition === "bridge"
+        ? { x: 450, y: cy - height * 0.52, rotate: 0, size: 9, anchor: "middle" }
+        : engravingPosition === "inner-rim"
+          ? { x: 450, y: cy + height * 0.52, rotate: 0, size: 9, anchor: "middle" }
+          : { x: 782, y: cy - 58, rotate: 9, size: 10, anchor: "middle" };
+    const engravingMarkup = `<text data-jp-engraving-svg x="${engravingAnchor.x.toFixed(1)}" y="${engravingAnchor.y.toFixed(1)}" text-anchor="${engravingAnchor.anchor}" transform="rotate(${engravingAnchor.rotate} ${engravingAnchor.x.toFixed(1)} ${engravingAnchor.y.toFixed(1)})" fill="#f6ead6" stroke="rgba(0,0,0,.5)" stroke-width=".5" paint-order="stroke" font-size="${engravingAnchor.size}" font-family="Georgia, serif" letter-spacing="1.6" opacity="${engraving ? 1 : 0}">${escapeHtml(engraving)}</text>`;
+
+    return `<svg class="jp-studio-svg" viewBox="0 0 900 560" role="img" aria-label="${escapeHtml(aria)}" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="${uid}-frame" x1="0" y1="0" x2="0.2" y2="1">
+          <stop offset="0" stop-color="${look.light}"/>
+          <stop offset=".45" stop-color="${look.color}"/>
+          <stop offset="1" stop-color="${look.dark}"/>
+        </linearGradient>
+        <radialGradient id="${uid}-lens" cx="38%" cy="26%" r="82%">
+          <stop offset="0" stop-color="${customizerStudioMix(lensColor, "#ffffff", 0.4)}"/>
+          <stop offset=".55" stop-color="${lensColor}"/>
+          <stop offset="1" stop-color="${customizerStudioMix(lensColor, "#000000", 0.34)}"/>
+        </radialGradient>
+        <linearGradient id="${uid}-sheen" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/>
+          <stop offset=".28" stop-color="#ffffff" stop-opacity=".04"/>
+          <stop offset=".62" stop-color="#ffffff" stop-opacity=".2"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </linearGradient>
+        <pattern id="${uid}-polarized" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+          <rect width="10" height="10" fill="transparent"/>
+          <line x1="0" y1="0" x2="0" y2="10" stroke="#ffffff" stroke-width="1.4" opacity=".55"/>
+        </pattern>
+        <radialGradient id="${uid}-blue" cx="30%" cy="18%" r="70%">
+          <stop offset="0" stop-color="#c8ecff" stop-opacity=".9"/>
+          <stop offset=".5" stop-color="#7fc7ea" stop-opacity=".32"/>
+          <stop offset="1" stop-color="#3c6f88" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="${uid}-ar" cx="24%" cy="20%" r="80%">
+          <stop offset="0" stop-color="#dbffe9" stop-opacity=".7"/>
+          <stop offset=".6" stop-color="#8fd9b6" stop-opacity=".16"/>
+          <stop offset="1" stop-color="#1d3b2c" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="${uid}-shadow" x="-25%" y="-25%" width="150%" height="160%">
+          <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#2b2114" flood-opacity=".24"/>
+        </filter>
+        <filter id="${uid}-blur"><feGaussianBlur stdDeviation="12"/></filter>
+      </defs>
+      <ellipse cx="450" cy="512" rx="300" ry="24" fill="#2b2114" opacity=".16" filter="url(#${uid}-blur)"/>
+      <g transform="translate(450 296) scale(${look.scale.toFixed(3)}) translate(-450 -296)" filter="url(#${uid}-shadow)">
+        <path d="${templePath("left")}" fill="none" stroke="${look.dark}" stroke-width="${(look.temple + 2).toFixed(1)}" stroke-linecap="round" opacity=".9"/>
+        <path d="${templePath("left")}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${look.temple.toFixed(1)}" stroke-linecap="round"/>
+        <path d="${templePath("right")}" fill="none" stroke="${look.dark}" stroke-width="${(look.temple + 2).toFixed(1)}" stroke-linecap="round" opacity=".9"/>
+        <path d="${templePath("right")}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${look.temple.toFixed(1)}" stroke-linecap="round"/>
+        ${templeDetail("left")}
+        ${templeDetail("right")}
+        <circle cx="${outerLeft.toFixed(1)}" cy="${templeStart.toFixed(1)}" r="${(look.rim * 0.62).toFixed(1)}" fill="${look.dark}"/>
+        <circle cx="${outerRight.toFixed(1)}" cy="${templeStart.toFixed(1)}" r="${(look.rim * 0.62).toFixed(1)}" fill="${look.dark}"/>
+        ${lensMarkup("left")}
+        ${lensMarkup("right")}
+        <path d="${bridgePath}" fill="none" stroke="${look.dark}" stroke-width="${(look.rim * 0.9 + 2).toFixed(1)}" stroke-linecap="round" opacity=".7"/>
+        <path d="${bridgePath}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${(look.rim * 0.9).toFixed(1)}" stroke-linecap="round"/>
+        ${nosePads}
+        ${browPath}
+        ${badgeMarkup}
+        ${engravingMarkup}
+      </g>
+    </svg>`;
+  };
+
+  const customizerPreviewPro = (frame, lens, settings = {}, compact = false) => {
+    const lensColor = customizerStudioHex(settings.lensColorCode || lens?.colorCode, "#8fa6a2");
+    const lensOpacity = customizerStudioClamp(
+      Number(settings.lensOpacity || lens?.tintOpacity) || 0.2,
+      0.12,
+      0.82,
+    );
+    const viewRotation = Number(settings.viewRotation || 0);
+    const viewTilt = Number(settings.viewTilt || 0);
+    const viewZoom = Number(settings.viewZoom || 1);
+    return `<div class="jp-customizer__stage jp-studio-stage${compact ? " is-compact" : ""}" data-jp-preview-stage style="--lens-color:${lensColor};--lens-opacity:${lensOpacity.toFixed(3)}">
+      <div class="jp-studio-stage__wash" aria-hidden="true"></div>
+      <div class="jp-studio-scene" data-jp-preview-scene style="--preview-rotate:${viewRotation}deg;--preview-tilt:${viewTilt}deg;--preview-scale:${viewZoom}">${customizerStudioSvg(frame, lens, settings)}</div>
+      ${
+        compact
+          ? ""
+          : `<div class="jp-studio-tools" aria-label="Preview controls">
+              <button type="button" data-jp-preview-action="reset" aria-label="Reset preview angle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5.3"/><path d="M4 4v4h4"/></svg></button>
+              <button type="button" data-jp-preview-action="zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M8 11h6M16 16l4 4"/></svg></button>
+              <button type="button" data-jp-preview-action="zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M8 11h6M11 8v6M16 16l4 4"/></svg></button>
+              <button type="button" data-jp-preview-action="fullscreen" aria-label="Open preview fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"/></svg></button>
+            </div>
+            <div class="jp-studio-stage__hint"><span>Drag to rotate</span><span>Scroll or use + / - to zoom</span></div>`
+      }
+    </div>`;
   };
 
   const setupProductCustomizerPro = () => {
@@ -1176,233 +1618,1225 @@
     if (!host) return;
 
     const customizer = document.createElement("section");
-    customizer.className = "jp-customizer jp-customizer--standalone jp-customizer--pro";
+    customizer.className = "jp-customizer jp-customizer--standalone jp-customizer--pro jp-studio";
     customizer.setAttribute("aria-labelledby", "jp-customizer-title");
-    customizer.innerHTML = '<div class="jp-customizer__loading">Loading frame and lens options…</div>';
+    customizer.innerHTML = '<div class="jp-studio-loading"><span></span><p>Preparing the atelier…</p></div>';
     host.appendChild(customizer);
 
-    const finishes = [
-      ["original", "Original", "#282725", 0],
-      ["silver", "Silver", "#c9cdd0", 45],
-      ["gold", "Gold", "#c8a64b", 75],
-      ["gunmetal", "Gunmetal", "#4d5153", 30],
-      ["rose-gold", "Rose gold", "#c58f82", 65],
-      ["crystal", "Crystal", "#d9d4c9", 25],
-    ].map(([id, name, color, price]) => ({ id, name, color, price }));
-    const shapes = ["Soft square", "Round", "Oval", "Rectangle", "Cat eye", "Aviator", "Butterfly", "Wayfarer", "Hexagon", "Geometric", "Shield", "Diamond"].map((name) => ({ id: customizerSlug(name), name }));
-    const designs = [["regular", "Regular cut", "Clean, classic edge", 0], ["diamond", "Diamond cut", "Hand-faceted edge", 95]].map(([id, name, meta, price]) => ({ id, name, meta, price }));
-    const cuts = [["classic", "Classic", "Balanced profile", 0], ["bevel", "Bevel", "Fine angled edge", 35], ["step", "Stepped", "Architectural layers", 55], ["faceted", "Faceted", "Light-catching planes", 70], ["contour", "Contour", "Sculpted outer edge", 85]].map(([id, name, meta, price]) => ({ id, name, meta, price }));
-    const corners = ["Soft", "Crisp", "Chiseled", "Rounded", "Micro", "Exaggerated", "Sculpted", "Crown"].map((name) => ({ id: customizerSlug(name), name }));
-    const colors = [["clear", "Clear", "#eef2f0", 0], ["blue", "Blue", "#5d8fa7", 20], ["green", "Green", "#667e6a", 20], ["gold", "Gold", "#b79a58", 25], ["white", "White", "#f5f3ed", 0], ["grey", "Grey", "#6d7476", 15], ["smoke", "Smoke", "#3f4a50", 25], ["rose", "Rose", "#a97578", 25], ["amber", "Amber", "#b97e4d", 25]].map(([id, name, color, price]) => ({ id, name, color, price }));
-    const lensTypes = [["non-prescription", "Non-prescription", "Fashion tint or clear", 0], ["prescription", "Prescription", "Made to your power", 85], ["readers", "Readers", "Everyday near vision", 45]].map(([id, name, meta, price]) => ({ id, name, meta, price }));
-    const protections = [["uv", "UV protection", "Blocks UVA + UVB rays", 0], ["blue-light", "Blue-light filter", "Softens screen glare", 35], ["polarized", "Polarized", "Cuts reflective glare", 45], ["anti-reflective", "Anti-reflective", "Clearer, cleaner optics", 25], ["scratch-resistant", "Scratch resistant", "Adds daily durability", 0]].map(([id, name, meta, price]) => ({ id, name, meta, price }));
-    const afterWear = [["fit-check", "Complimentary fit check", "A final fit review before dispatch", 0], ["travel-case", "Signature travel case", "Protective case in soft leather", 35], ["care-kit", "Lens care kit", "Cloth, spray and storage pouch", 18]].map(([id, name, meta, price]) => ({ id, name, meta, price }));
-    const steps = [
-      ["frame", "Frame", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l1-3h8l1 3h4"/><path d="M4 12v3a3 3 0 0 0 6 0v-3M14 12v3a3 3 0 0 0 6 0v-3"/></svg>'],
-      ["lens", "Lens", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8c2.5-2 13.5-2 16 0v7c-2.5 2-13.5 2-16 0Z"/></svg>'],
-      ["design", "Design", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 8-8 10-8-10 8-8Z"/><path d="m4 11 8 2 8-2"/></svg>'],
-      ["cuts", "Cuts", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/></svg>'],
-      ["corners", "Corners", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V8a3 3 0 0 1 3-3h11"/></svg>'],
-      ["color", "Color", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8c0-1.7-1.3-3-3-3h-1a2 2 0 0 1-2-2V6a2 2 0 0 0-2-2Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14" cy="7.5" r="1"/></svg>'],
-      ["protection", "Protection", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>'],
-      ["engraving", "Engraving", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/></svg>'],
+    const FALLBACK_OPTIONS = {
+      finishes: [
+        { id: "original", name: "Original", color: "#282725", price: 0, visual: true },
+        { id: "silver", name: "Silver", color: "#c9cdd0", price: 45, visual: true },
+        { id: "gold", name: "Gold", color: "#c8a64b", price: 75, visual: true },
+        { id: "gunmetal", name: "Gunmetal", color: "#4d5153", price: 30, visual: true },
+        { id: "rose-gold", name: "Rose gold", color: "#c58f82", price: 65, visual: true },
+        { id: "crystal", name: "Crystal", color: "#d9d4c9", price: 25, visual: true },
+      ],
+      shapes: [
+        { id: "soft-square", name: "Soft square", price: 0, visual: true },
+        { id: "round", name: "Round", price: 0, visual: true },
+        { id: "oval", name: "Oval", price: 0, visual: true },
+        { id: "rectangle", name: "Rectangle", price: 0, visual: true },
+        { id: "cat-eye", name: "Cat eye", price: 0, visual: true },
+        { id: "aviator", name: "Aviator", price: 0, visual: true },
+        { id: "butterfly", name: "Butterfly", price: 0, visual: true },
+        { id: "wayfarer", name: "Wayfarer", price: 0, visual: true },
+        { id: "hexagon", name: "Hexagon", price: 0, visual: true },
+        { id: "geometric", name: "Geometric", price: 0, visual: true },
+        { id: "shield", name: "Shield", price: 0, visual: true },
+        { id: "diamond", name: "Diamond", price: 0, visual: true },
+      ],
+      designs: [
+        { id: "regular", name: "Regular cut", meta: "Clean, classic edge", price: 0, visual: true },
+        { id: "diamond", name: "Diamond cut", meta: "Hand-faceted edge", price: 95, visual: true },
+      ],
+      cuts: [
+        { id: "classic", name: "Classic", meta: "Balanced profile", price: 0, visual: true },
+        { id: "bevel", name: "Bevel", meta: "Fine angled edge", price: 35, visual: true },
+        { id: "step", name: "Stepped", meta: "Architectural layers", price: 55, visual: true },
+        { id: "faceted", name: "Faceted", meta: "Light-catching planes", price: 70, visual: true },
+        { id: "contour", name: "Contour", meta: "Sculpted outer edge", price: 85, visual: true },
+      ],
+      corners: [
+        { id: "soft", name: "Soft", price: 0, visual: true },
+        { id: "crisp", name: "Crisp", price: 0, visual: true },
+        { id: "chiseled", name: "Chiseled", price: 0, visual: true },
+        { id: "rounded", name: "Rounded", price: 0, visual: true },
+        { id: "micro", name: "Micro", price: 0, visual: true },
+        { id: "exaggerated", name: "Exaggerated", price: 0, visual: true },
+        { id: "sculpted", name: "Sculpted", price: 0, visual: true },
+        { id: "crown", name: "Crown", price: 0, visual: true },
+      ],
+      colors: [
+        { id: "clear", name: "Clear", color: "#eef2f0", price: 0, visual: true },
+        { id: "blue", name: "Blue", color: "#5d8fa7", price: 20, visual: true },
+        { id: "green", name: "Green", color: "#667e6a", price: 20, visual: true },
+        { id: "gold", name: "Gold", color: "#b79a58", price: 25, visual: true },
+        { id: "white", name: "White", color: "#f5f3ed", price: 0, visual: true },
+        { id: "grey", name: "Grey", color: "#6d7476", price: 15, visual: true },
+        { id: "smoke", name: "Smoke", color: "#3f4a50", price: 25, visual: true },
+        { id: "rose", name: "Rose", color: "#a97578", price: 25, visual: true },
+        { id: "amber", name: "Amber", color: "#b97e4d", price: 25, visual: true },
+      ],
+      lensTypes: [
+        { id: "non-prescription", name: "Non-prescription", meta: "Fashion tint or clear", price: 0, visual: true },
+        { id: "prescription", name: "Prescription", meta: "Made to your power", price: 85, visual: true },
+        { id: "readers", name: "Readers", meta: "Everyday near vision", price: 45, visual: true },
+      ],
+      protections: [
+        { id: "uv", name: "UV protection", meta: "Blocks UVA + UVB rays", price: 0, visual: false },
+        { id: "blue-light", name: "Blue-light filter", meta: "Softens screen glare", price: 35, visual: true },
+        { id: "polarized", name: "Polarized", meta: "Cuts reflective glare", price: 45, visual: true },
+        { id: "anti-reflective", name: "Anti-reflective", meta: "Clearer, cleaner optics", price: 25, visual: true },
+        { id: "scratch-resistant", name: "Scratch resistant", meta: "Adds daily durability", price: 0, visual: false },
+      ],
+      afterWear: [
+        { id: "fit-check", name: "Complimentary fit check", meta: "A final fit review before dispatch", price: 0, visual: false },
+        { id: "travel-case", name: "Signature travel case", meta: "Protective case in soft leather", price: 35, visual: false },
+        { id: "care-kit", name: "Lens care kit", meta: "Cloth, spray and storage pouch", price: 18, visual: false },
+      ],
+      engravingPrice: 35,
+    };
+
+    const STEPS = [
+      { id: "frame", label: "Frame", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l1-3h8l1 3h4"/><path d="M4 12v3a3 3 0 0 0 6 0v-3M14 12v3a3 3 0 0 0 6 0v-3"/></svg>' },
+      { id: "lens", label: "Lens", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8c2.5-2 13.5-2 16 0v7c-2.5 2-13.5 2-16 0Z"/></svg>' },
+      { id: "design", label: "Design", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 8-8 10-8-10 8-8Z"/><path d="m4 11 8 2 8-2"/></svg>' },
+      { id: "cuts", label: "Cuts", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/></svg>' },
+      { id: "corners", label: "Corners", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V8a3 3 0 0 1 3-3h11"/></svg>' },
+      { id: "color", label: "Color", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8c0-1.7-1.3-3-3-3h-1a2 2 0 0 1-2-2V6a2 2 0 0 0-2-2Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14" cy="7.5" r="1"/></svg>' },
+      { id: "protection", label: "Protection", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>' },
+      { id: "engraving", label: "Engraving", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/></svg>' },
     ];
-    const stepNavigation = steps.map(([id, label, icon], index) => `<button type="button" class="jp-customizer__step${index === 0 ? " is-active" : ""}" data-jp-customizer-step="${id}" data-jp-customizer-target="jp-customizer-step-${id}" aria-current="${index === 0 ? "step" : "false"}">${icon}<span>${label}</span></button>`).join("");
-    const resetState = () => ({ frameId: "", lensId: "", frameType: "All", frameStyle: "All", showAllFrames: false, frameFinish: "original", lensShape: "soft-square", lensDesign: "regular", lensCut: "classic", cornerStyle: "soft", lensColor: "clear", lensColorTouched: false, lensType: "non-prescription", protectionIds: ["uv"], prescriptionLeft: "", prescriptionRight: "", engraving: "", engravingPosition: "temple", afterWearIds: ["fit-check"], viewRotation: 0, viewTilt: 0, viewZoom: 1, comparisons: [] });
-    const state = resetState();
+
+    const STATE_KEY = "jp_customizer_state_v2";
+    const resetState = () => ({
+      frameId: "",
+      lensId: "",
+      frameType: "All",
+      frameStyle: "All",
+      showAllFrames: false,
+      frameFinish: "original",
+      lensShape: "soft-square",
+      lensDesign: "regular",
+      lensCut: "classic",
+      cornerStyle: "soft",
+      lensColor: "clear",
+      lensColorTouched: false,
+      lensType: "non-prescription",
+      protectionIds: ["uv"],
+      prescriptionLeft: "",
+      prescriptionRight: "",
+      engraving: "",
+      engravingPosition: "temple",
+      afterWearIds: ["fit-check"],
+      viewRotation: 0,
+      viewTilt: 0,
+      viewZoom: 1,
+      comparisons: [],
+    });
+
+    const restoreState = () => {
+      try {
+        const raw = sessionStorage.getItem(STATE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+        const base = resetState();
+        const restored = { ...base };
+        for (const key of Object.keys(base)) {
+          if (key === "comparisons") continue;
+          if (parsed[key] !== undefined && parsed[key] !== null) restored[key] = parsed[key];
+        }
+        restored.protectionIds = Array.isArray(parsed.protectionIds)
+          ? parsed.protectionIds.map(String)
+          : base.protectionIds;
+        restored.afterWearIds = Array.isArray(parsed.afterWearIds)
+          ? parsed.afterWearIds.map(String)
+          : base.afterWearIds;
+        restored.comparisons = Array.isArray(parsed.comparisons)
+          ? parsed.comparisons
+              .filter((item) => item && item.frameId && item.lensId && item.settings)
+              .slice(0, 3)
+          : [];
+        restored.viewRotation = Number(parsed.viewRotation) || 0;
+        restored.viewTilt = Number(parsed.viewTilt) || 0;
+        restored.viewZoom = Number(parsed.viewZoom) || 1;
+        restored.engraving = String(parsed.engraving || "").slice(0, 16);
+        restored.prescriptionLeft = String(parsed.prescriptionLeft || "");
+        restored.prescriptionRight = String(parsed.prescriptionRight || "");
+        return restored;
+      } catch {
+        return null;
+      }
+    };
+
+    let state = restoreState() || resetState();
     let activeStep = "frame";
     let customizerData = null;
-    const find = (items, id) => items.find((item) => item.id === id) || items[0];
-    const getFrame = () => customizerData?.frames?.find((item) => String(item.id) === String(state.frameId));
+    let options = FALLBACK_OPTIONS;
+    let lastLensType = "";
+
+    const mergeOptions = (incoming) => {
+      const merged = {};
+      for (const key of Object.keys(FALLBACK_OPTIONS)) {
+        if (key === "engravingPrice") {
+          merged[key] = Number(incoming?.[key] ?? FALLBACK_OPTIONS[key]);
+          continue;
+        }
+        const base = FALLBACK_OPTIONS[key];
+        const list = Array.isArray(incoming?.[key]) && incoming[key].length ? incoming[key] : base;
+        merged[key] = list
+          .map((item) => {
+            const fallback = base.find((candidate) => candidate.id === item.id) || {};
+            return {
+              ...fallback,
+              ...item,
+              id: String(item.id || fallback.id || ""),
+              name: String(item.name || fallback.name || ""),
+              price: Number(item.price ?? fallback.price ?? 0),
+              visual: item.visual ?? fallback.visual ?? true,
+            };
+          })
+          .filter((item) => item.id);
+      }
+      return merged;
+    };
+
+    const persist = () => {
+      try {
+        sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
+      } catch {
+        return;
+      }
+    };
+
+    const optionById = (list, id) => list.find((item) => String(item.id) === String(id)) || list[0];
+    const getFrame = () =>
+      customizerData?.frames?.find((item) => String(item.id) === String(state.frameId));
     const getLenses = (frame = getFrame()) => {
       if (!frame || !customizerData) return [];
-      const ids = Array.isArray(customizerData.compatibility?.[frame.id]) ? customizerData.compatibility[frame.id] : [];
-      return ids.length ? customizerData.lenses.filter((item) => ids.includes(String(item.id))) : customizerData.lenses;
+      const ids = Array.isArray(customizerData.compatibility?.[frame.id])
+        ? customizerData.compatibility[frame.id]
+        : [];
+      return ids.length
+        ? customizerData.lenses.filter((item) => ids.includes(String(item.id)))
+        : customizerData.lenses;
     };
-    const getLens = () => getLenses().find((item) => String(item.id) === String(state.lensId)) || getLenses()[0];
-    const moneyWithSign = (value, currency = "USD") => Number(value || 0) ? `+${customizerMoney(value, currency)}` : "Complimentary";
+    const getLens = () =>
+      getLenses().find((item) => String(item.id) === String(state.lensId)) || getLenses()[0];
+    const currentCurrency = () => {
+      const frame = getFrame();
+      const lens = getLens();
+      return frame?.currency || lens?.currency || "USD";
+    };
+    const mapLensColor = (lens) => {
+      const map = {
+        clear: "clear",
+        "ice blue": "blue",
+        smoke: "smoke",
+        amber: "amber",
+        olive: "green",
+        graphite: "grey",
+      };
+      return map[normalize(lens?.color)] || "clear";
+    };
+
+    const ensureSelection = () => {
+      if (!customizerData) return;
+      const frames = customizerData.frames || [];
+      if (!frames.length) return;
+      if (!state.frameId || !frames.some((item) => String(item.id) === String(state.frameId))) {
+        const preferred = frames.find((item) => Number(item.productId) === productId);
+        state.frameId = String(preferred?.id || frames[0].id);
+      }
+      const lenses = getLenses();
+      if (!lenses.length) {
+        state.lensId = "";
+        return;
+      }
+      if (!state.lensId || !lenses.some((item) => String(item.id) === String(state.lensId))) {
+        state.lensId = String(lenses[0].id);
+      }
+      const ensureOption = (list, value, fallback) =>
+        list.some((item) => String(item.id) === String(value))
+          ? String(value)
+          : list.some((item) => String(item.id) === String(fallback))
+            ? String(fallback)
+            : String(list[0]?.id || "");
+      state.frameFinish = ensureOption(options.finishes, state.frameFinish, "original");
+      state.lensShape = ensureOption(options.shapes, state.lensShape, "soft-square");
+      state.lensDesign = ensureOption(options.designs, state.lensDesign, "regular");
+      state.lensCut = ensureOption(options.cuts, state.lensCut, "classic");
+      state.cornerStyle = ensureOption(options.corners, state.cornerStyle, "soft");
+      state.lensColor = ensureOption(options.colors, state.lensColor, "clear");
+      state.lensType = ensureOption(options.lensTypes, state.lensType, "non-prescription");
+      state.protectionIds = (Array.isArray(state.protectionIds) ? state.protectionIds : [])
+        .map(String)
+        .filter((id) => options.protections.some((item) => String(item.id) === id));
+      if (!state.protectionIds.length) state.protectionIds = ["uv"];
+      state.afterWearIds = (Array.isArray(state.afterWearIds) ? state.afterWearIds : [])
+        .map(String)
+        .filter((id) => options.afterWear.some((item) => String(item.id) === id));
+      if (!state.afterWearIds.length) state.afterWearIds = ["fit-check"];
+      if (!state.lensColorTouched) state.lensColor = mapLensColor(getLens());
+      state.comparisons = state.comparisons.filter(
+        (item) =>
+          frames.some((frame) => String(frame.id) === String(item.frameId)) &&
+          (customizerData.lenses || []).some((lens) => String(lens.id) === String(item.lensId)),
+      );
+    };
+
+    const moneyWithSign = (value, currency = currentCurrency()) => {
+      const amount = Number(value || 0);
+      return amount > 0 ? `+${customizerMoney(amount, currency)}` : "Included";
+    };
+
     const selection = () => {
       const frame = getFrame();
       const lens = getLens();
-      const finish = find(finishes, state.frameFinish);
-      const shape = find(shapes, state.lensShape);
-      const design = find(designs, state.lensDesign);
-      const cut = find(cuts, state.lensCut);
-      const corner = find(corners, state.cornerStyle);
-      const color = find(colors, state.lensColor);
-      const lensType = find(lensTypes, state.lensType);
-      const protection = protections.filter((item) => state.protectionIds.includes(item.id));
-      const extras = afterWear.filter((item) => state.afterWearIds.includes(item.id));
+      const finish = optionById(options.finishes, state.frameFinish);
+      const shape = optionById(options.shapes, state.lensShape);
+      const design = optionById(options.designs, state.lensDesign);
+      const cut = optionById(options.cuts, state.lensCut);
+      const corner = optionById(options.corners, state.cornerStyle);
+      const color = optionById(options.colors, state.lensColor);
+      const lensType = optionById(options.lensTypes, state.lensType);
+      const protection = options.protections.filter((item) =>
+        state.protectionIds.includes(String(item.id)),
+      );
+      const extras = options.afterWear.filter((item) =>
+        state.afterWearIds.includes(String(item.id)),
+      );
       const lineItems = [
         { label: frame?.name || "Selected frame", amount: Number(frame?.price || 0), base: true },
         { label: lens?.name || "Base lens", amount: Number(lens?.price || 0), base: true },
-        { label: `${finish.name} finish`, amount: finish.price },
-        { label: `${shape.name} lens shape`, amount: 0 },
-        { label: design.name, amount: design.price },
-        { label: `${cut.name} lens cut`, amount: cut.price },
-        { label: `${corner.name} corners`, amount: 0 },
-        { label: `${color.name} lens color`, amount: color.price },
-        { label: lensType.name, amount: lensType.price },
-        ...protection.map((item) => ({ label: item.name, amount: item.price })),
-        ...(state.engraving.trim() ? [{ label: "Personal engraving", amount: 35 }] : []),
-        ...extras.map((item) => ({ label: item.name, amount: item.price })),
+        { label: `${finish.name} finish`, amount: Number(finish.price || 0) },
+        { label: `${shape.name} lens shape`, amount: Number(shape.price || 0) },
+        { label: design.name, amount: Number(design.price || 0) },
+        { label: `${cut.name} lens cut`, amount: Number(cut.price || 0) },
+        { label: `${corner.name} corners`, amount: Number(corner.price || 0) },
+        { label: `${color.name} lens color`, amount: Number(color.price || 0) },
+        { label: lensType.name, amount: Number(lensType.price || 0) },
+        ...protection.map((item) => ({ label: item.name, amount: Number(item.price || 0) })),
+        ...(state.engraving.trim()
+          ? [{ label: "Personal engraving", amount: Number(options.engravingPrice || 0) }]
+          : []),
+        ...extras.map((item) => ({ label: item.name, amount: Number(item.price || 0) })),
       ];
-      return { frame, lens, finish, shape, design, cut, corner, color, lensType, protection, extras, lineItems, total: lineItems.reduce((sum, item) => sum + item.amount, 0) };
+      return {
+        frame,
+        lens,
+        finish,
+        shape,
+        design,
+        cut,
+        corner,
+        color,
+        lensType,
+        protection,
+        extras,
+        lineItems,
+        total: lineItems.reduce((sum, item) => sum + item.amount, 0),
+      };
     };
-    const choice = (item, group, selected, className = "") => `<button type="button" class="jp-customizer__choice ${className}${selected ? " is-selected" : ""}" data-jp-choice="${group}" data-jp-choice-value="${item.id}" aria-pressed="${selected}"><span class="jp-customizer__choice-visual jp-customizer__choice-visual--${customizerSlug(item.id)}" aria-hidden="true"></span><span class="jp-customizer__choice-copy"><strong>${escapeHtml(item.name)}</strong>${item.meta ? `<small>${escapeHtml(item.meta)}</small>` : ""}</span>${item.price ? `<span class="jp-customizer__choice-price">${escapeHtml(moneyWithSign(item.price))}</span>` : ""}</button>`;
-    const swatch = (item, group, selected, className = "") => `<button type="button" class="jp-customizer__swatch-button ${className}${selected ? " is-selected" : ""}" data-jp-choice="${group}" data-jp-choice-value="${item.id}" aria-label="${escapeHtml(item.name)}${item.price ? `, ${escapeHtml(moneyWithSign(item.price))}` : ", complimentary"}" aria-pressed="${selected}"><span class="jp-customizer__swatch-large" style="--swatch:${customizerColor(item.color)}"></span><span>${escapeHtml(item.name)}</span>${item.price ? `<small>${escapeHtml(moneyWithSign(item.price))}</small>` : ""}</button>`;
-    const updateView = () => {
+
+    const visibleFrames = () => {
+      const frames = customizerData?.frames || [];
+      return frames
+        .filter((item) => state.frameType === "All" || String(item.frameType) === state.frameType)
+        .filter((item) => state.frameStyle === "All" || String(item.style) === state.frameStyle);
+    };
+
+    const shapeGlyph = (shapeId) => {
+      const geometry = customizerStudioLensGeometry(shapeId, state.cornerStyle);
+      return `<svg viewBox="-132 -98 264 196" aria-hidden="true"><path d="${geometry.d}" fill="rgba(28,26,23,.07)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/></svg>`;
+    };
+    const cornerGlyph = (cornerId) => {
+      const geometry = customizerStudioLensGeometry(state.lensShape, cornerId);
+      return `<svg viewBox="-132 -98 264 196" aria-hidden="true"><path d="${geometry.d}" fill="rgba(28,26,23,.07)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/></svg>`;
+    };
+    const cutGlyph = (cutId) => {
+      const geometry = customizerStudioLensGeometry(state.lensShape, state.cornerStyle);
+      const inset = (scale, opacity, width) =>
+        `<path d="${geometry.d}" transform="scale(${scale})" fill="none" stroke="currentColor" stroke-width="${width}" opacity="${opacity}"/>`;
+      let detail = "";
+      if (cutId === "bevel") detail = inset(0.9, 0.55, 3);
+      if (cutId === "step") detail = inset(0.9, 0.5, 2.5) + inset(0.8, 0.35, 2);
+      if (cutId === "faceted") {
+        detail =
+          inset(0.88, 0.45, 2.5) +
+          `<path d="M 0 ${-geometry.height / 2} L ${geometry.width / 2} ${geometry.height / 6} L 0 ${geometry.height / 2} L ${-geometry.width / 2} ${geometry.height / 6} Z" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/>`;
+      }
+      if (cutId === "contour") detail = inset(0.86, 0.5, 6);
+      return `<svg viewBox="-132 -98 264 196" aria-hidden="true"><path d="${geometry.d}" fill="rgba(28,26,23,.07)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>${detail}</svg>`;
+    };
+    const designGlyph = (designId) => {
+      const geometry = customizerStudioLensGeometry(state.lensShape, state.cornerStyle);
+      const facets =
+        designId === "diamond"
+          ? `<path d="M 0 ${-geometry.height / 2} L ${geometry.width / 2} 0 L 0 ${geometry.height / 2} L ${-geometry.width / 2} 0 Z" fill="none" stroke="currentColor" stroke-width="2" opacity=".55"/><path d="M 0 ${-geometry.height / 2} L 0 ${geometry.height / 2} M ${-geometry.width / 2} 0 L ${geometry.width / 2} 0" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/>`
+          : "";
+      return `<svg viewBox="-132 -98 264 196" aria-hidden="true"><path d="${geometry.d}" fill="rgba(28,26,23,.07)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>${facets}</svg>`;
+    };
+    const lensTypeGlyph = (id) =>
+      id === "prescription"
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h6l2 10H7L5 7Zm8 0h6l-2 10h-6l2-10Z"/><path d="M11 7h2"/></svg>'
+        : id === "readers"
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="3.2"/><circle cx="16" cy="12" r="3.2"/><path d="M11.2 12h1.6"/></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9c2.5-1.8 13.5-1.8 16 0v6c-2.5 1.8-13.5 1.8-16 0Z"/></svg>';
+
+    const frameGridMarkup = () => {
+      const frames = visibleFrames();
+      const shown = state.showAllFrames ? frames : frames.slice(0, 8);
+      if (!shown.length) {
+        return '<p class="jp-studio-empty">No frames match these filters. Try another style.</p>';
+      }
+      return shown
+        .map((item) => {
+          const selected = String(item.id) === String(state.frameId);
+          const swatch = customizerStudioHex(
+            /^#/.test(String(item.colorCode || "")) ? item.colorCode : item.color,
+            "#2a2723",
+          );
+          return `<button type="button" class="jp-studio-frame${selected ? " is-selected" : ""}" data-jp-frame="${escapeHtml(item.id)}" aria-pressed="${selected}">
+            <span class="jp-studio-frame__media"><img src="${escapeHtml(item.imageUrl || "/mirror-assets/placeholder.svg")}" alt="" loading="lazy"></span>
+            <span class="jp-studio-frame__body">
+              <span class="jp-studio-frame__name">${escapeHtml(item.name)}</span>
+              <span class="jp-studio-frame__meta">${escapeHtml(item.style || "Classic")} · ${escapeHtml(item.frameType || "Eyewear")}</span>
+              <span class="jp-studio-frame__price">${escapeHtml(customizerMoney(item.price, item.currency))}</span>
+            </span>
+            <span class="jp-studio-frame__swatch" style="--swatch:${swatch}" aria-hidden="true"></span>
+            <span class="jp-studio-check" aria-hidden="true">✓</span>
+          </button>`;
+        })
+        .join("");
+    };
+
+    const lensGridMarkup = () => {
+      const lenses = getLenses();
+      if (!lenses.length) {
+        return '<p class="jp-studio-empty">This frame has no compatible lenses yet.</p>';
+      }
+      return lenses
+        .map((item) => {
+          const selected = String(item.id) === String(state.lensId);
+          const swatch = customizerStudioHex(item.colorCode, "#9fb3ad");
+          const opacity = customizerStudioClamp(Number(item.tintOpacity) || 0.2, 0.12, 0.82);
+          return `<button type="button" class="jp-studio-lens${selected ? " is-selected" : ""}" data-jp-lens="${escapeHtml(item.id)}" aria-pressed="${selected}">
+            <span class="jp-studio-lens__swatch" style="--swatch:${swatch};--swatch-opacity:${opacity.toFixed(2)}" aria-hidden="true"></span>
+            <span class="jp-studio-lens__copy">
+              <strong>${escapeHtml(item.name)}</strong>
+              <small>${escapeHtml(item.lensType || "Lens")} · ${escapeHtml(item.style || "Classic")}</small>
+              <em>${escapeHtml(item.description || "A considered everyday lens")}</em>
+            </span>
+            <span class="jp-studio-lens__price">${item.price ? `+${escapeHtml(customizerMoney(item.price, item.currency))}` : "Included"}</span>
+            <span class="jp-studio-check" aria-hidden="true">✓</span>
+          </button>`;
+        })
+        .join("");
+    };
+
+    const choiceMarkup = (item, group, selected, kind) => {
+      const glyph =
+        kind === "shape"
+          ? shapeGlyph(item.id)
+          : kind === "corner"
+            ? cornerGlyph(item.id)
+            : kind === "cut"
+              ? cutGlyph(item.id)
+              : kind === "lensType"
+                ? lensTypeGlyph(item.id)
+                : designGlyph(item.id);
+      return `<button type="button" class="jp-studio-choice jp-studio-choice--${kind}${selected ? " is-selected" : ""}" data-jp-choice="${group}" data-jp-choice-value="${escapeHtml(item.id)}" aria-pressed="${selected}">
+        <span class="jp-studio-choice__glyph" aria-hidden="true">${glyph}</span>
+        <span class="jp-studio-choice__copy">
+          <strong>${escapeHtml(item.name)}</strong>
+          ${item.meta ? `<small>${escapeHtml(item.meta)}</small>` : ""}
+        </span>
+        ${item.price ? `<span class="jp-studio-choice__price">${escapeHtml(moneyWithSign(item.price))}</span>` : ""}
+        <span class="jp-studio-check" aria-hidden="true">✓</span>
+      </button>`;
+    };
+
+    const swatchMarkup = (item, group, selected, kind) => {
+      const color = customizerStudioHex(item.color, "#d6d1ca");
+      const light = customizerStudioMix(color, "#ffffff", 0.45);
+      return `<button type="button" class="jp-studio-swatch${selected ? " is-selected" : ""}${kind === "finish" ? " jp-studio-swatch--finish" : ""}" data-jp-choice="${group}" data-jp-choice-value="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)}${item.price ? `, ${escapeHtml(moneyWithSign(item.price))}` : ", included"}" aria-pressed="${selected}">
+        <span class="jp-studio-swatch__dot" style="--swatch:${color};--swatch-light:${light}" aria-hidden="true"></span>
+        <span class="jp-studio-swatch__copy"><strong>${escapeHtml(item.name)}</strong>${item.price ? `<small>${escapeHtml(moneyWithSign(item.price))}</small>` : ""}</span>
+        <span class="jp-studio-check" aria-hidden="true">✓</span>
+      </button>`;
+    };
+
+    const toggleMarkup = (item, group, selected) => {
+      const visual = item.visual !== false;
+      return `<button type="button" class="jp-studio-toggle${selected ? " is-selected" : ""}" data-jp-choice="${group}" data-jp-choice-value="${escapeHtml(item.id)}" aria-pressed="${selected}">
+        <span class="jp-studio-toggle__check" aria-hidden="true">✓</span>
+        <span class="jp-studio-toggle__copy">
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${escapeHtml(item.meta || "")}</small>
+          ${visual ? "" : '<em class="jp-studio-no-visual">No visual change</em>'}
+        </span>
+        <span class="jp-studio-toggle__price">${item.price ? escapeHtml(moneyWithSign(item.price)) : "Included"}</span>
+      </button>`;
+    };
+
+    const stepNavMarkup = () =>
+      STEPS.map(
+        (step, index) =>
+          `<button type="button" class="jp-studio-step${index === 0 ? " is-active" : ""}" data-jp-step="${step.id}" aria-current="${index === 0 ? "step" : "false"}">
+            <span class="jp-studio-step__icon" aria-hidden="true">${step.icon}</span>
+            <span class="jp-studio-step__label">${step.label}</span>
+            <i class="jp-studio-step__dot" aria-hidden="true"></i>
+          </button>`,
+      ).join("");
+
+    const chipMarkup = (current) => {
+      const chips = [
+        { step: "frame", label: current.frame.name, meta: "Frame" },
+        { step: "lens", label: current.lens.name, meta: "Lens" },
+        { step: "design", label: current.shape.name, meta: "Shape" },
+        { step: "cuts", label: current.cut.name, meta: "Cut" },
+        { step: "corners", label: current.corner.name, meta: "Corners" },
+        { step: "color", label: current.color.name, meta: "Color" },
+      ];
+      if (current.protection.length) {
+        chips.push({
+          step: "protection",
+          label: `${current.protection.length} protection`,
+          meta: "Protection",
+        });
+      }
+      if (state.engraving.trim()) {
+        chips.push({
+          step: "engraving",
+          label: `“${state.engraving.trim()}”`,
+          meta: "Engraving",
+        });
+      }
+      return chips
+        .map(
+          (chip) =>
+            `<button type="button" class="jp-studio-chip" data-jp-chip-step="${chip.step}"><span>${escapeHtml(chip.meta)}</span><strong>${escapeHtml(chip.label)}</strong></button>`,
+        )
+        .join("");
+    };
+
+    const orderLineMarkup = (current, currency) =>
+      current.lineItems
+        .filter((item) => item.base || item.amount > 0)
+        .map(
+          (item) =>
+            `<div><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(
+              item.base ? customizerMoney(item.amount, currency) : moneyWithSign(item.amount, currency),
+            )}</strong></div>`,
+        )
+        .join("");
+
+    const renderShell = () => {
+      const current = selection();
+      if (!current.frame || !current.lens) {
+        customizer.innerHTML =
+          '<p class="jp-customizer__error">This frame has no compatible lenses yet. Please choose another frame.</p>';
+        return;
+      }
+      const frameTypes = ["All", ...new Set((customizerData.frames || []).map((item) => String(item.frameType || "Eyewear")))];
+      const frameStyles = ["All", ...new Set((customizerData.frames || []).map((item) => String(item.style || "Classic")))];
+      const currency = current.frame.currency || current.lens.currency || "USD";
+      const previewSettings = {
+        ...state,
+        lensColorCode: current.color.color,
+        lensOpacity: current.lens.tintOpacity,
+        lensColorName: current.color.name,
+        lensShapeName: current.shape.name,
+      };
+
+      customizer.innerHTML = `
+        <div class="jp-studio-head">
+          <div class="jp-studio-head__copy">
+            <span class="jp-studio-eyebrow">JP Atelier · Made to order</span>
+            <h1 id="jp-customizer-title">Build your pair</h1>
+            <p>Start with a frame. Shape every detail until it feels unmistakably yours.</p>
+          </div>
+          <div class="jp-studio-head__meta">
+            <span class="jp-studio-live"><i aria-hidden="true"></i> Live preview</span>
+            <span class="jp-studio-saved" data-jp-saved>Selections saved automatically</span>
+          </div>
+        </div>
+        <div class="jp-studio-layout">
+          <div class="jp-studio-visual">
+            <div class="jp-studio-visual__top">
+              <div class="jp-studio-visual__label"><span>Now viewing</span><strong data-jp-frame-name>${escapeHtml(current.frame.name)}</strong></div>
+              <span class="jp-studio-visual__meta" data-jp-frame-meta>${escapeHtml(current.frame.style || "Classic")} · ${escapeHtml(current.frame.frameType || "Eyewear")}</span>
+            </div>
+            <div class="jp-studio-mount" data-jp-preview-mount>${customizerPreviewPro(current.frame, current.lens, previewSettings)}</div>
+            <div class="jp-studio-visual__under">
+              <div class="jp-studio-view">
+                <button type="button" data-jp-preview-action="zoom-out" aria-label="Zoom out">−</button>
+                <span data-jp-zoom-label>${Math.round(state.viewZoom * 100)}%</span>
+                <button type="button" data-jp-preview-action="zoom-in" aria-label="Zoom in">+</button>
+                <button type="button" class="jp-studio-view__reset" data-jp-preview-action="reset">Reset view</button>
+              </div>
+              <div class="jp-studio-chips" data-jp-chips>${chipMarkup(current)}</div>
+            </div>
+            <div class="jp-studio-visual__foot">
+              <div class="jp-studio-visual__detail">
+                <span data-jp-lens-summary>${escapeHtml(`${current.color.name} lens · ${current.shape.name} · ${current.cut.name} cut`)}</span>
+                <small data-jp-live-note>${liveNote(current)}</small>
+              </div>
+              <strong data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</strong>
+            </div>
+          </div>
+          <div class="jp-studio-controls">
+            <div class="jp-studio-steps-wrap">
+              <nav class="jp-studio-steps" aria-label="Customization steps">${stepNavMarkup()}</nav>
+            </div>
+            <div class="jp-studio-panels">
+              <section class="jp-studio-panel" data-jp-panel="frame">
+                <header class="jp-studio-panel__head"><div><span>01</span><h2>Frame</h2></div><small data-jp-frame-count>${visibleFrames().length} frames</small></header>
+                <p class="jp-studio-panel__lede">Choose the silhouette that starts it all.</p>
+                <div class="jp-studio-filters">
+                  <label>Type<select data-jp-filter-type>${frameTypes.map((value) => `<option value="${escapeHtml(value)}"${value === state.frameType ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>
+                  <label>Style<select data-jp-filter-style>${frameStyles.map((value) => `<option value="${escapeHtml(value)}"${value === state.frameStyle ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label>
+                </div>
+                <div class="jp-studio-frame-grid" data-jp-frame-grid>${frameGridMarkup()}</div>
+                <button type="button" class="jp-studio-more" data-jp-show-all${visibleFrames().length <= 8 ? " hidden" : ""}>${state.showAllFrames ? "Show fewer frames" : `View all ${visibleFrames().length} frames`}</button>
+                <div class="jp-studio-subhead"><span>Frame finish</span><small>Metal tone</small></div>
+                <div class="jp-studio-swatches">${options.finishes.map((item) => swatchMarkup(item, "frameFinish", item.id === state.frameFinish, "finish")).join("")}</div>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="lens">
+                <header class="jp-studio-panel__head"><div><span>02</span><h2>Lens</h2></div><small data-jp-lens-count>${getLenses().length} compatible</small></header>
+                <p class="jp-studio-panel__lede">Start with the lens technology that fits your days.</p>
+                <div class="jp-studio-lens-grid" data-jp-lens-grid>${lensGridMarkup()}</div>
+                <div class="jp-studio-subhead"><span>Lens type</span><small>Optical or sun</small></div>
+                <div class="jp-studio-choice-grid jp-studio-choice-grid--three">${options.lensTypes.map((item) => choiceMarkup(item, "lensType", item.id === state.lensType, "lensType")).join("")}</div>
+                <div class="jp-studio-prescription" data-jp-prescription></div>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="design">
+                <header class="jp-studio-panel__head"><div><span>03</span><h2>Design</h2></div><small>${options.shapes.length} shapes</small></header>
+                <p class="jp-studio-panel__lede">Sculpt the outline, then choose the edge character.</p>
+                <div class="jp-studio-subhead"><span>Lens shape</span><small>Silhouette</small></div>
+                <div class="jp-studio-shape-grid">${options.shapes.map((item) => choiceMarkup(item, "lensShape", item.id === state.lensShape, "shape")).join("")}</div>
+                <div class="jp-studio-subhead"><span>Edge character</span><small>Design</small></div>
+                <div class="jp-studio-choice-grid jp-studio-choice-grid--two">${options.designs.map((item) => choiceMarkup(item, "lensDesign", item.id === state.lensDesign, "design")).join("")}</div>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="cuts">
+                <header class="jp-studio-panel__head"><div><span>04</span><h2>Lens cuts</h2></div><small>${options.cuts.length} finishes</small></header>
+                <p class="jp-studio-panel__lede">A fine edge changes how light travels across the lens.</p>
+                <div class="jp-studio-choice-grid">${options.cuts.map((item) => choiceMarkup(item, "lensCut", item.id === state.lensCut, "cut")).join("")}</div>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="corners">
+                <header class="jp-studio-panel__head"><div><span>05</span><h2>Corners</h2></div><small>${options.corners.length} signatures</small></header>
+                <p class="jp-studio-panel__lede">Soft, sharp or sculpted — the corners set the temperament.</p>
+                <div class="jp-studio-corner-grid">${options.corners.map((item) => choiceMarkup(item, "cornerStyle", item.id === state.cornerStyle, "corner")).join("")}</div>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="color">
+                <header class="jp-studio-panel__head"><div><span>06</span><h2>Lens color</h2></div><small>Instantly visualized</small></header>
+                <p class="jp-studio-panel__lede">Every tint is applied to the live preview as you choose.</p>
+                <div class="jp-studio-swatches jp-studio-swatches--lens">${options.colors.map((item) => swatchMarkup(item, "lensColor", item.id === state.lensColor, "color")).join("")}</div>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="protection">
+                <header class="jp-studio-panel__head"><div><span>07</span><h2>Protection</h2></div><small>Choose one or more</small></header>
+                <p class="jp-studio-panel__lede">Optical properties that change how the lens performs.</p>
+                <div class="jp-studio-toggle-list">${options.protections.map((item) => toggleMarkup(item, "protectionIds", state.protectionIds.includes(String(item.id)))).join("")}</div>
+                <p class="jp-studio-note">Options marked “No visual change” are optical or durability upgrades — they do not alter the frame’s appearance.</p>
+              </section>
+              <section class="jp-studio-panel" data-jp-panel="engraving">
+                <header class="jp-studio-panel__head"><div><span>08</span><h2>Engraving</h2></div><small>Make it yours</small></header>
+                <p class="jp-studio-panel__lede">A quiet signature, etched into the frame.</p>
+                <label class="jp-studio-field">Engraving text <span>Up to 16 characters · ${escapeHtml(moneyWithSign(options.engravingPrice, currency))}</span><input type="text" maxlength="16" value="${escapeHtml(state.engraving)}" data-jp-engraving placeholder="Your initials or a quiet signature"></label>
+                <label class="jp-studio-field">Position<select data-jp-engraving-position><option value="temple"${state.engravingPosition === "temple" ? " selected" : ""}>Outer temple</option><option value="bridge"${state.engravingPosition === "bridge" ? " selected" : ""}>Bridge</option><option value="inner-rim"${state.engravingPosition === "inner-rim" ? " selected" : ""}>Inner rim</option></select></label>
+                <div class="jp-studio-subhead"><span>After-wear</span><small>Complimentary + upgrades</small></div>
+                <div class="jp-studio-toggle-list">${options.afterWear.map((item) => toggleMarkup(item, "afterWearIds", state.afterWearIds.includes(String(item.id)))).join("")}</div>
+              </section>
+            </div>
+            <div class="jp-studio-actions">
+              <button type="button" class="jp-studio-reset" data-jp-reset>Reset customization</button>
+              <button type="button" class="jp-studio-compare" data-jp-compare${state.comparisons.length >= 3 ? " disabled" : ""}>${state.comparisons.length >= 3 ? "Comparison saved" : "Save to compare"}</button>
+              <button type="button" class="jp-studio-add" data-jp-add>Add pair to bag <span data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</span></button>
+            </div>
+            <div data-jp-comparisons></div>
+            <aside class="jp-studio-order">
+              <div class="jp-studio-order__head">
+                <div><span>Made to order</span><h2>Good things take a little intention.</h2></div>
+                <strong data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</strong>
+              </div>
+              <div class="jp-studio-order__lines" data-jp-lines>${orderLineMarkup(current, currency)}</div>
+              <p class="jp-studio-order__note" data-jp-live-note>${liveNote(current)}</p>
+            </aside>
+          </div>
+        </div>
+        <div class="jp-studio-announcer" aria-live="polite" data-jp-announcer></div>
+      `;
+      bindPreview();
+      renderPrescription();
+      renderComparisons();
+      syncPanels();
+      syncUI();
+    };
+
+    const renderPreview = () => {
+      const scene = customizer.querySelector("[data-jp-preview-scene]");
+      const current = selection();
+      if (!scene || !current.frame || !current.lens) return;
+      scene.innerHTML = customizerStudioSvg(current.frame, current.lens, {
+        ...state,
+        lensColorCode: current.color.color,
+        lensOpacity: current.lens.tintOpacity,
+        lensColorName: current.color.name,
+        lensShapeName: current.shape.name,
+      });
+      applyView();
+    };
+
+    const applyView = () => {
       const scene = customizer.querySelector("[data-jp-preview-scene]");
       if (!scene) return;
       scene.style.setProperty("--preview-rotate", `${state.viewRotation}deg`);
       scene.style.setProperty("--preview-tilt", `${state.viewTilt}deg`);
-      scene.style.setProperty("--preview-scale", state.viewZoom);
+      scene.style.setProperty("--preview-scale", String(state.viewZoom));
+      const label = customizer.querySelector("[data-jp-zoom-label]");
+      if (label) label.textContent = `${Math.round(state.viewZoom * 100)}%`;
     };
-    const updateLive = () => {
+
+    const updateEngraving = () => {
+      const text = state.engraving.trim().slice(0, 16);
+      const element = customizer.querySelector("[data-jp-preview-mount] [data-jp-engraving-svg]");
+      if (!element) return;
+      element.textContent = text;
+      element.setAttribute("opacity", text ? "1" : "0");
+    };
+
+    const liveNote = (current) => {
+      const paid = current.lineItems.filter((item) => !item.base && item.amount > 0).length;
+      const included = current.lineItems.filter((item) => !item.base && item.amount === 0).length;
+      return `${paid} paid upgrade${paid === 1 ? "" : "s"} · ${included} included`;
+    };
+
+    const syncPanels = () => {
+      customizer.querySelectorAll("[data-jp-panel]").forEach((panel) => {
+        const isActive = panel.dataset.jpPanel === activeStep;
+        panel.hidden = !isActive;
+        panel.classList.toggle("is-active", isActive);
+      });
+      customizer.querySelectorAll("[data-jp-step]").forEach((step) => {
+        const isActive = step.dataset.jpStep === activeStep;
+        step.classList.toggle("is-active", isActive);
+        step.setAttribute("aria-current", isActive ? "step" : "false");
+      });
+    };
+
+    const renderFrameGrid = () => {
+      const grid = customizer.querySelector("[data-jp-frame-grid]");
+      if (grid) grid.innerHTML = frameGridMarkup();
+      const count = customizer.querySelector("[data-jp-frame-count]");
+      if (count) count.textContent = `${visibleFrames().length} frames`;
+      const more = customizer.querySelector("[data-jp-show-all]");
+      if (more) {
+        more.hidden = visibleFrames().length <= 8;
+        more.textContent = state.showAllFrames
+          ? "Show fewer frames"
+          : `View all ${visibleFrames().length} frames`;
+      }
+    };
+
+    const renderLensGrid = () => {
+      const grid = customizer.querySelector("[data-jp-lens-grid]");
+      if (grid) grid.innerHTML = lensGridMarkup();
+      const count = customizer.querySelector("[data-jp-lens-count]");
+      if (count) count.textContent = `${getLenses().length} compatible`;
+    };
+
+    const renderPrescription = () => {
+      const container = customizer.querySelector("[data-jp-prescription]");
+      if (!container) return;
+      if (container.dataset.jpLensType === state.lensType) return;
+      container.dataset.jpLensType = state.lensType;
+      container.innerHTML =
+        state.lensType === "prescription"
+          ? `<div class="jp-studio-rx">
+              <label>Left eye<input type="number" min="-20" max="20" step="0.25" value="${escapeHtml(state.prescriptionLeft)}" data-jp-prescription="left" placeholder="−2.00"></label>
+              <label>Right eye<input type="number" min="-20" max="20" step="0.25" value="${escapeHtml(state.prescriptionRight)}" data-jp-prescription="right" placeholder="−2.00"></label>
+              <p>Enter a simple sphere power. We’ll confirm your full prescription after checkout.</p>
+            </div>`
+          : "";
+    };
+
+    const renderComparisons = () => {
+      const container = customizer.querySelector("[data-jp-comparisons]");
+      if (!container) return;
+      const frame = getFrame();
+      const lens = getLens();
+      const currency = frame?.currency || lens?.currency || "USD";
+      if (!state.comparisons.length) {
+        container.innerHTML = "";
+        return;
+      }
+      container.innerHTML = `<div class="jp-studio-compare-list">
+        <div class="jp-studio-subhead"><span>Compare combinations</span><small>${state.comparisons.length}/3 saved</small></div>
+        <div class="jp-studio-compare-grid">
+          ${state.comparisons
+            .map((item, index) => {
+              const compareFrame = customizerData?.frames?.find((candidate) => String(candidate.id) === String(item.frameId));
+              const compareLens = customizerData?.lenses?.find((candidate) => String(candidate.id) === String(item.lensId));
+              if (!compareFrame || !compareLens) return "";
+              const settings = item.settings || {};
+              return `<article class="jp-studio-compare-card">
+                <button type="button" class="jp-studio-compare-remove" data-jp-compare-remove="${index}" aria-label="Remove comparison">Remove</button>
+                <div class="jp-studio-compare-visual">${customizerPreviewPro(compareFrame, compareLens, settings, true)}</div>
+                <strong>${escapeHtml(compareFrame.name)}</strong>
+                <small>${escapeHtml(settings.lensColorName || compareLens.name)} · ${escapeHtml(customizerMoney(item.total, currency))}</small>
+              </article>`;
+            })
+            .join("")}
+        </div>
+      </div>`;
+    };
+
+    const syncUI = () => {
       const current = selection();
       if (!current.frame || !current.lens) return;
       const currency = current.frame.currency || current.lens.currency || "USD";
-      customizer.querySelectorAll("[data-jp-live-total]").forEach((element) => { element.textContent = customizerMoney(current.total, currency); });
-      customizer.querySelectorAll("[data-jp-live-engraving]").forEach((element) => { element.textContent = state.engraving; element.parentElement?.classList.toggle("has-text", Boolean(state.engraving.trim())); });
-      const note = customizer.querySelector("[data-jp-live-total-note]");
-      if (note) note.textContent = `${current.lineItems.filter((item) => item.amount > 0 && !item.base).length} paid upgrades · UV protection + fit check included`;
+      customizer.querySelectorAll("[data-jp-live-total]").forEach((element) => {
+        element.textContent = customizerMoney(current.total, currency);
+      });
+      customizer.querySelectorAll("[data-jp-live-note]").forEach((element) => {
+        element.textContent = liveNote(current);
+      });
+      const frameName = customizer.querySelector("[data-jp-frame-name]");
+      if (frameName) frameName.textContent = current.frame.name;
+      const frameMeta = customizer.querySelector("[data-jp-frame-meta]");
+      if (frameMeta) {
+        frameMeta.textContent = `${current.frame.style || "Classic"} · ${current.frame.frameType || "Eyewear"}`;
+      }
+      const lensSummary = customizer.querySelector("[data-jp-lens-summary]");
+      if (lensSummary) {
+        lensSummary.textContent = `${current.color.name} lens · ${current.shape.name} · ${current.cut.name} cut`;
+      }
+      const chips = customizer.querySelector("[data-jp-chips]");
+      if (chips) chips.innerHTML = chipMarkup(current);
+      const lines = customizer.querySelector("[data-jp-lines]");
+      if (lines) lines.innerHTML = orderLineMarkup(current, currency);
+      const compare = customizer.querySelector("[data-jp-compare]");
+      if (compare) {
+        compare.disabled = state.comparisons.length >= 3;
+        compare.textContent = state.comparisons.length >= 3 ? "Comparison saved" : "Save to compare";
+      }
+      const frameCount = customizer.querySelector("[data-jp-frame-count]");
+      if (frameCount) frameCount.textContent = `${visibleFrames().length} frames`;
+      const lensCount = customizer.querySelector("[data-jp-lens-count]");
+      if (lensCount) lensCount.textContent = `${getLenses().length} compatible`;
+      customizer.querySelectorAll("[data-jp-choice]").forEach((button) => {
+        const group = button.dataset.jpChoice;
+        const value = button.dataset.jpChoiceValue;
+        const selected = Array.isArray(state[group])
+          ? state[group].map(String).includes(String(value))
+          : String(state[group]) === String(value);
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      customizer.querySelectorAll("[data-jp-frame]").forEach((button) => {
+        const selected = String(button.dataset.jpFrame) === String(state.frameId);
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      customizer.querySelectorAll("[data-jp-lens]").forEach((button) => {
+        const selected = String(button.dataset.jpLens) === String(state.lensId);
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      const customized = {
+        frame: state.frameFinish !== "original",
+        lens: state.lensType !== "non-prescription",
+        design: state.lensShape !== "soft-square" || state.lensDesign !== "regular",
+        cuts: state.lensCut !== "classic",
+        corners: state.cornerStyle !== "soft",
+        color: state.lensColor !== "clear" || state.lensColorTouched,
+        protection: state.protectionIds.length > 1,
+        engraving: Boolean(state.engraving.trim()) || state.afterWearIds.length > 1,
+      };
+      customizer.querySelectorAll("[data-jp-step]").forEach((step) => {
+        step.classList.toggle("has-selection", Boolean(customized[step.dataset.jpStep]));
+      });
+      if (lastLensType !== state.lensType) {
+        lastLensType = state.lensType;
+        renderPrescription();
+      }
     };
+
+    const commit = ({ preview = true, frameGrid = false, lensGrid = false, comparisons = false } = {}) => {
+      if (frameGrid) renderFrameGrid();
+      if (lensGrid) renderLensGrid();
+      if (comparisons) renderComparisons();
+      if (preview) renderPreview();
+      syncUI();
+      persist();
+      const announcer = customizer.querySelector("[data-jp-announcer]");
+      if (announcer) {
+        const current = selection();
+        if (current.frame && current.lens) {
+          announcer.textContent = `Preview updated. ${current.frame.name}, ${current.shape.name} shape, ${current.cut.name} cut, ${current.corner.name} corners, ${current.color.name} lens.`;
+        }
+      }
+    };
+
+    const goToStep = (step, scroll = false) => {
+      if (!step) return;
+      activeStep = step;
+      syncPanels();
+      if (!scroll) return;
+      const controls = customizer.querySelector(".jp-studio-controls");
+      if (!controls) return;
+      if (window.matchMedia("(max-width: 1180px)").matches) {
+        controls.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        controls.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+
     const bindPreview = () => {
       const stage = customizer.querySelector("[data-jp-preview-stage]");
       if (!stage) return;
+      stage.setAttribute("tabindex", "0");
       let dragging = false;
       let startX = 0;
       let startY = 0;
       let startRotation = 0;
       let startTilt = 0;
-      stage.addEventListener("pointerdown", (event) => { dragging = true; startX = event.clientX; startY = event.clientY; startRotation = state.viewRotation; startTilt = state.viewTilt; stage.setPointerCapture?.(event.pointerId); stage.classList.add("is-dragging"); });
-      stage.addEventListener("pointermove", (event) => { if (!dragging) return; state.viewRotation = startRotation + (event.clientX - startX) * 0.45; state.viewTilt = Math.max(-16, Math.min(16, startTilt - (event.clientY - startY) * 0.22)); updateView(); });
-      const stop = (event) => { dragging = false; stage.releasePointerCapture?.(event.pointerId); stage.classList.remove("is-dragging"); };
+      stage.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("[data-jp-preview-action]")) return;
+        dragging = true;
+        startX = event.clientX;
+        startY = event.clientY;
+        startRotation = state.viewRotation;
+        startTilt = state.viewTilt;
+        stage.setPointerCapture?.(event.pointerId);
+        stage.classList.add("is-dragging");
+      });
+      stage.addEventListener("pointermove", (event) => {
+        if (!dragging) return;
+        state.viewRotation = startRotation + (event.clientX - startX) * 0.45;
+        state.viewTilt = customizerStudioClamp(startTilt - (event.clientY - startY) * 0.22, -18, 18);
+        applyView();
+      });
+      const stop = (event) => {
+        if (!dragging) return;
+        dragging = false;
+        stage.releasePointerCapture?.(event.pointerId);
+        stage.classList.remove("is-dragging");
+        persist();
+      };
       stage.addEventListener("pointerup", stop);
       stage.addEventListener("pointercancel", stop);
-      stage.addEventListener("wheel", (event) => { event.preventDefault(); state.viewZoom = Math.max(0.86, Math.min(1.42, state.viewZoom + (event.deltaY > 0 ? -0.05 : 0.05))); updateView(); }, { passive: false });
-      customizer.querySelectorAll("[data-jp-preview-action]").forEach((button) => {
-        button.addEventListener("pointerdown", (event) => event.stopPropagation());
-        button.addEventListener("click", () => {
-          const action = button.dataset.jpPreviewAction;
-          if (action === "zoom-in") state.viewZoom = Math.min(1.42, state.viewZoom + 0.08);
-          if (action === "zoom-out") state.viewZoom = Math.max(0.86, state.viewZoom - 0.08);
-          if (action === "reset") Object.assign(state, { viewRotation: 0, viewTilt: 0, viewZoom: 1 });
-          if (action === "fullscreen") {
-            if (document.fullscreenElement) document.exitFullscreen?.();
-            else stage.requestFullscreen?.();
-          }
-          updateView();
-        });
+      stage.addEventListener(
+        "wheel",
+        (event) => {
+          event.preventDefault();
+          state.viewZoom = customizerStudioClamp(
+            state.viewZoom + (event.deltaY > 0 ? -0.05 : 0.05),
+            0.78,
+            1.55,
+          );
+          applyView();
+          persist();
+        },
+        { passive: false },
+      );
+      stage.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") state.viewRotation -= 6;
+        else if (event.key === "ArrowRight") state.viewRotation += 6;
+        else if (event.key === "ArrowUp") state.viewTilt = customizerStudioClamp(state.viewTilt - 4, -18, 18);
+        else if (event.key === "ArrowDown") state.viewTilt = customizerStudioClamp(state.viewTilt + 4, -18, 18);
+        else if (event.key === "+" || event.key === "=") state.viewZoom = customizerStudioClamp(state.viewZoom + 0.06, 0.78, 1.55);
+        else if (event.key === "-" || event.key === "_") state.viewZoom = customizerStudioClamp(state.viewZoom - 0.06, 0.78, 1.55);
+        else if (event.key === "0") Object.assign(state, { viewRotation: 0, viewTilt: 0, viewZoom: 1 });
+        else return;
+        event.preventDefault();
+        applyView();
+        persist();
       });
     };
-    const render = (data) => {
-      const frames = Array.isArray(data.frames) ? data.frames : [];
-      const allLenses = Array.isArray(data.lenses) ? data.lenses : [];
-      if (!frames.length || !allLenses.length) { customizer.innerHTML = '<p class="jp-customizer__error">Customization options are not available right now. Please try again shortly.</p>'; return; }
-      if (!state.frameId || !frames.some((item) => String(item.id) === state.frameId)) state.frameId = String(frames.find((item) => Number(item.productId) === productId)?.id || frames[0].id);
-      const frame = getFrame() || frames[0];
-      const compatibleIds = Array.isArray(data.compatibility?.[frame.id]) ? data.compatibility[frame.id] : [];
-      const lenses = compatibleIds.length ? allLenses.filter((item) => compatibleIds.includes(String(item.id))) : allLenses;
-      if (!lenses.length) { customizer.innerHTML = '<p class="jp-customizer__error">This frame has no compatible lenses yet.</p>'; return; }
-      if (!state.lensId || !lenses.some((item) => String(item.id) === state.lensId)) state.lensId = String(lenses[0].id);
-      const lens = getLens() || lenses[0];
-      const frameTypes = ["All", ...new Set(frames.map((item) => String(item.frameType || "Eyewear")))];
-      const frameStyles = ["All", ...new Set(frames.map((item) => String(item.style || "Classic")))];
-      if (!frameTypes.includes(state.frameType)) state.frameType = "All";
-      if (!frameStyles.includes(state.frameStyle)) state.frameStyle = "All";
-      const visibleFrames = frames.filter((item) => state.frameType === "All" || String(item.frameType) === state.frameType).filter((item) => state.frameStyle === "All" || String(item.style) === state.frameStyle);
-      const visibleFrameCards = (state.showAllFrames ? visibleFrames : visibleFrames.slice(0, 8)).map((item) => `<button type="button" class="jp-customizer__option${String(item.id) === String(frame.id) ? " is-selected" : ""}" data-jp-customizer-frame="${escapeHtml(item.id)}" aria-pressed="${String(item.id) === String(frame.id)}"><span class="jp-customizer__option-image"><img src="${escapeHtml(item.imageUrl || "/mirror-assets/placeholder.svg")}" alt="" loading="lazy"></span><span class="jp-customizer__option-name">${escapeHtml(item.name)}</span><span class="jp-customizer__option-meta">${escapeHtml(item.style || "Classic")} · ${escapeHtml(item.frameType || "Eyewear")}</span><span class="jp-customizer__swatch" style="--swatch:${customizerColor(item.colorCode)}"></span></button>`).join("");
-      const lensCards = lenses.map((item) => `<button type="button" class="jp-customizer__lens-option${String(item.id) === String(lens.id) ? " is-selected" : ""}" data-jp-customizer-lens="${escapeHtml(item.id)}" aria-pressed="${String(item.id) === String(lens.id)}"><span class="jp-customizer__lens-swatch" style="--swatch:${customizerColor(item.colorCode)};--lens-opacity:${Math.min(0.82, Math.max(0.12, Number(item.tintOpacity) || 0.2))}" aria-hidden="true"></span><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.lensType)} · ${escapeHtml(item.style)}</small><em>${escapeHtml(item.description || "A considered everyday lens")}</em></span><span class="jp-customizer__lens-price">${item.price ? `+${escapeHtml(customizerMoney(item.price, item.currency))}` : "Included"}</span></button>`).join("");
-      const current = selection();
-      const currency = frame.currency || lens.currency || "USD";
-      const comparisonMarkup = state.comparisons.length ? `<div class="jp-customizer__comparison" aria-label="Saved combinations"><div class="jp-customizer__subhead"><span>Compare combinations</span><small>${state.comparisons.length}/3 saved</small></div><div class="jp-customizer__comparison-grid">${state.comparisons.map((item, index) => `<article class="jp-customizer__comparison-card"><button type="button" class="jp-customizer__remove" data-jp-customizer-remove="${index}" aria-label="Remove comparison">Remove</button>${customizerPreviewPro(item.frame, item.lens, item.settings, true)}<strong>${escapeHtml(item.frame.name)}</strong><small>${escapeHtml(item.settings.lensColorName || item.lens.name)} · ${escapeHtml(customizerMoney(item.total, currency))}</small></article>`).join("")}</div></div>` : "";
-      const lineMarkup = current.lineItems.map((item) => `<div><span>${escapeHtml(item.label)}</span><strong>${item.base ? escapeHtml(customizerMoney(item.amount, currency)) : escapeHtml(moneyWithSign(item.amount, currency))}</strong></div>`).join("");
-      customizer.innerHTML = `<div class="jp-customizer__head"><div><h1 id="jp-customizer-title">Build your pair</h1><p>Start with a frame. Shape every detail until it feels unmistakably yours.</p></div><span class="jp-customizer__live"><i></i> Live preview</span></div><div class="jp-customizer__layout"><div class="jp-customizer__visual"><div class="jp-customizer__visual-label"><span>Now viewing</span><strong>${escapeHtml(frame.name)}</strong></div>${customizerPreviewPro(frame, lens, { ...state, lensColorCode: current.color.color, lensOpacity: lens.tintOpacity })}<div class="jp-customizer__preview-hint"><span>Drag to rotate</span><span>Scroll or use + / − to zoom</span></div><div class="jp-customizer__preview-controls"><button type="button" data-jp-preview-action="zoom-out" aria-label="Zoom out">−</button><span>${Math.round(state.viewZoom * 100)}%</span><button type="button" data-jp-preview-action="zoom-in" aria-label="Zoom in">+</button><button type="button" data-jp-preview-action="reset">Reset view</button></div><div class="jp-customizer__visual-foot"><span>${escapeHtml(current.color.name)} lens · ${escapeHtml(current.shape.name)}</span><strong data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</strong></div></div><div class="jp-customizer__controls"><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>01 / Frame</span><small>${visibleFrames.length} available</small></div><div class="jp-customizer__filters"><label>Type<select data-jp-customizer-frame-type>${frameTypes.map((value) => `<option value="${escapeHtml(value)}"${value === state.frameType ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label><label>Style<select data-jp-customizer-frame-style>${frameStyles.map((value) => `<option value="${escapeHtml(value)}"${value === state.frameStyle ? " selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select></label></div><div class="jp-customizer__options">${visibleFrameCards || '<p class="jp-customizer__empty">No frames match these filters.</p>'}</div>${visibleFrames.length > 8 ? `<button type="button" class="jp-customizer__show-more" data-jp-customizer-show-all>${state.showAllFrames ? "Show fewer frames" : `View all ${visibleFrames.length} frames`}</button>` : ""}<div class="jp-customizer__subhead jp-customizer__subhead--minor"><span>Frame finish</span><small>Premium materials</small></div><div class="jp-customizer__swatches jp-customizer__swatches--finishes">${finishes.map((item) => swatch(item, "frameFinish", item.id === state.frameFinish, "jp-customizer__finish-button")).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>02 / Base lens</span><small>${lenses.length} compatible</small></div><div class="jp-customizer__lens-options">${lensCards}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>03 / Lens shape</span><small>${shapes.length} profiles</small></div><div class="jp-customizer__shape-grid">${shapes.map((item) => choice(item, "lensShape", item.id === state.lensShape, "jp-customizer__shape-choice")).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>04 / Lens design</span><small>Edge character</small></div><div class="jp-customizer__choice-grid jp-customizer__choice-grid--two">${designs.map((item) => choice(item, "lensDesign", item.id === state.lensDesign)).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>05 / Lens cuts</span><small>Five finishes</small></div><div class="jp-customizer__choice-grid">${cuts.map((item) => choice(item, "lensCut", item.id === state.lensCut)).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>06 / Corner styles</span><small>Eight signatures</small></div><div class="jp-customizer__corner-grid">${corners.map((item) => choice(item, "cornerStyle", item.id === state.cornerStyle, "jp-customizer__corner-choice")).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>07 / Lens colors</span><small>Instantly visualized</small></div><div class="jp-customizer__swatches jp-customizer__swatches--lens">${colors.map((item) => swatch(item, "lensColor", item.id === state.lensColor, "jp-customizer__lens-color-button")).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>08 / Lens protection</span><small>Choose one or more</small></div><div class="jp-customizer__protection-list">${protections.map((item) => `<button type="button" class="jp-customizer__protection${state.protectionIds.includes(item.id) ? " is-selected" : ""}" data-jp-choice="protectionIds" data-jp-choice-value="${item.id}" aria-pressed="${state.protectionIds.includes(item.id)}"><span class="jp-customizer__check">✓</span><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.meta)}</small></span><em>${escapeHtml(moneyWithSign(item.price, currency))}</em></button>`).join("")}</div></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>09 / Prescription</span><small>Optical or sun</small></div><div class="jp-customizer__choice-grid jp-customizer__choice-grid--three">${lensTypes.map((item) => choice(item, "lensType", item.id === state.lensType)).join("")}</div>${state.lensType === "prescription" ? `<div class="jp-customizer__prescription"><label>Left eye<input type="number" min="-20" max="20" step="0.25" value="${escapeHtml(state.prescriptionLeft)}" data-jp-prescription="left" placeholder="−2.00"></label><label>Right eye<input type="number" min="-20" max="20" step="0.25" value="${escapeHtml(state.prescriptionRight)}" data-jp-prescription="right" placeholder="−2.00"></label><p>Enter a simple sphere power. We’ll confirm your full prescription after checkout.</p></div>` : ""}</section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>10 / Personalization</span><small>Make it yours</small></div><label class="jp-customizer__engraving-field">Engraving text <span>Up to 16 characters · +$35</span><input type="text" maxlength="16" value="${escapeHtml(state.engraving)}" data-jp-engraving placeholder="Your initials or a quiet signature"></label><label class="jp-customizer__engraving-field">Position<select data-jp-engraving-position><option value="temple"${state.engravingPosition === "temple" ? " selected" : ""}>Outer temple</option><option value="bridge"${state.engravingPosition === "bridge" ? " selected" : ""}>Bridge</option><option value="inner-rim"${state.engravingPosition === "inner-rim" ? " selected" : ""}>Inner rim</option></select></label></section><section class="jp-customizer__section"><div class="jp-customizer__subhead"><span>11 / After-wear</span><small>Complimentary + upgrades</small></div><div class="jp-customizer__protection-list">${afterWear.map((item) => `<button type="button" class="jp-customizer__protection${state.afterWearIds.includes(item.id) ? " is-selected" : ""}" data-jp-choice="afterWearIds" data-jp-choice-value="${item.id}" aria-pressed="${state.afterWearIds.includes(item.id)}"><span class="jp-customizer__check">✓</span><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.meta)}</small></span><em>${escapeHtml(moneyWithSign(item.price, currency))}</em></button>`).join("")}</div></section><section class="jp-customizer__summary"><div class="jp-customizer__summary-head"><div><span>Made to order</span><h2>Good things take a little intention.</h2></div><strong data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</strong></div><div class="jp-customizer__summary-lines">${lineMarkup}</div><p class="jp-customizer__summary-note" data-jp-live-total-note>${current.lineItems.filter((item) => item.amount > 0 && !item.base).length} paid upgrades · UV protection + fit check included</p></section><div class="jp-customizer__actions"><button type="button" class="jp-customizer__reset" data-jp-customizer-reset>Reset customization</button><button type="button" class="jp-customizer__compare" data-jp-customizer-compare${state.comparisons.length >= 3 ? " disabled" : ""}>${state.comparisons.length >= 3 ? "Comparison saved" : "Save to compare"}</button><button type="button" class="jp-customizer__add" data-jp-customizer-add>Add pair to bag <span data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</span></button></div>${comparisonMarkup}</div></div>`;
-      const controls = customizer.querySelector(".jp-customizer__controls");
-      controls?.insertAdjacentHTML("afterbegin", `<nav class="jp-customizer__steps" aria-label="Customization steps">${stepNavigation}</nav>`);
-      customizer.querySelectorAll("[data-jp-customizer-step]").forEach((step) => {
-        const active = step.dataset.jpCustomizerStep === activeStep;
-        step.classList.toggle("is-active", active);
-        step.setAttribute("aria-current", active ? "step" : "false");
-      });
-      ["frame", "lens", "shape", "design", "cuts", "corners", "color", "protection", "prescription", "engraving", "after-wear"].forEach((id, index) => {
-        const section = customizer.querySelectorAll(".jp-customizer__section")[index];
-        if (section) {
-          section.id = `jp-customizer-step-${id}`;
-          section.dataset.jpCustomizerSection = id;
-        }
-      });
-      applyCustomizerPreviewMasks(customizer);
-      bindPreview();
-    };
+
     customizer.addEventListener("click", (event) => {
-      const target = event.target.closest("[data-jp-customizer-frame], [data-jp-customizer-lens], [data-jp-customizer-show-all], [data-jp-customizer-compare], [data-jp-customizer-remove], [data-jp-customizer-add], [data-jp-customizer-reset], [data-jp-customizer-step], [data-jp-choice]");
-      if (!target) return;
-      if (target.dataset.jpCustomizerStep) {
-        activeStep = target.dataset.jpCustomizerStep;
-        const section = customizer.querySelector(`#${target.dataset.jpCustomizerTarget}`);
-        section?.scrollIntoView({ behavior: "smooth", block: "start" });
-        customizer.querySelectorAll("[data-jp-customizer-step]").forEach((step) => {
-          const active = step === target;
-          step.classList.toggle("is-active", active);
-          step.setAttribute("aria-current", active ? "step" : "false");
-        });
+      const step = event.target.closest("[data-jp-step]");
+      if (step) {
+        goToStep(step.dataset.jpStep, true);
         return;
       }
-      if (target.dataset.jpCustomizerFrame) state.frameId = target.dataset.jpCustomizerFrame;
-      if (target.dataset.jpCustomizerLens) {
-        state.lensId = target.dataset.jpCustomizerLens;
-        if (!state.lensColorTouched) {
-          const selectedLens = customizerData?.lenses?.find((item) => String(item.id) === String(state.lensId));
-          const lensColorMap = { clear: "clear", "ice blue": "blue", smoke: "smoke", amber: "amber", olive: "green", graphite: "grey" };
-          const mappedColor = lensColorMap[normalize(selectedLens?.color)] || "clear";
-          state.lensColor = mappedColor;
+      const chip = event.target.closest("[data-jp-chip-step]");
+      if (chip) {
+        goToStep(chip.dataset.jpChipStep, true);
+        return;
+      }
+      const action = event.target.closest("[data-jp-preview-action]");
+      if (action) {
+        const value = action.dataset.jpPreviewAction;
+        if (value === "zoom-in") state.viewZoom = customizerStudioClamp(state.viewZoom + 0.08, 0.78, 1.55);
+        if (value === "zoom-out") state.viewZoom = customizerStudioClamp(state.viewZoom - 0.08, 0.78, 1.55);
+        if (value === "reset") Object.assign(state, { viewRotation: 0, viewTilt: 0, viewZoom: 1 });
+        if (value === "fullscreen") {
+          const stage = customizer.querySelector("[data-jp-preview-stage]");
+          if (document.fullscreenElement) document.exitFullscreen?.();
+          else stage?.requestFullscreen?.();
         }
+        applyView();
+        persist();
+        return;
       }
-      if (target.hasAttribute("data-jp-customizer-show-all")) state.showAllFrames = !state.showAllFrames;
-      if (target.dataset.jpCustomizerRemove !== undefined) state.comparisons.splice(Number(target.dataset.jpCustomizerRemove), 1);
-      if (target.dataset.jpChoice === "protectionIds" || target.dataset.jpChoice === "afterWearIds") {
-        const list = state[target.dataset.jpChoice];
-        const index = list.indexOf(target.dataset.jpChoiceValue);
-        if (index >= 0 && list.length > 1) list.splice(index, 1); else if (index < 0) list.push(target.dataset.jpChoiceValue);
-      } else if (target.dataset.jpChoice) {
-        state[target.dataset.jpChoice] = target.dataset.jpChoiceValue;
-        if (target.dataset.jpChoice === "lensColor") state.lensColorTouched = true;
+      const frameCard = event.target.closest("[data-jp-frame]");
+      if (frameCard) {
+        state.frameId = String(frameCard.dataset.jpFrame);
+        ensureSelection();
+        if (!state.lensColorTouched) state.lensColor = mapLensColor(getLens());
+        commit({ preview: true, frameGrid: true, lensGrid: true });
+        return;
       }
-      if (target.hasAttribute("data-jp-customizer-reset")) { const frameId = state.frameId; const lensId = state.lensId; Object.assign(state, resetState(), { frameId, lensId }); showToast("Customization reset"); }
-      if (target.hasAttribute("data-jp-customizer-compare")) {
+      const lensCard = event.target.closest("[data-jp-lens]");
+      if (lensCard) {
+        state.lensId = String(lensCard.dataset.jpLens);
+        if (!state.lensColorTouched) state.lensColor = mapLensColor(getLens());
+        commit({ preview: true, lensGrid: true });
+        return;
+      }
+      const choice = event.target.closest("[data-jp-choice]");
+      if (choice) {
+        const group = choice.dataset.jpChoice;
+        const value = choice.dataset.jpChoiceValue;
+        if (group === "protectionIds" || group === "afterWearIds") {
+          const list = Array.isArray(state[group]) ? [...state[group]] : [];
+          const index = list.indexOf(value);
+          if (index >= 0) {
+            if (list.length > 1) list.splice(index, 1);
+          } else {
+            list.push(value);
+          }
+          state[group] = list;
+        } else {
+          state[group] = value;
+          if (group === "lensColor") state.lensColorTouched = true;
+        }
+        commit({ preview: true });
+        return;
+      }
+      if (event.target.closest("[data-jp-show-all]")) {
+        state.showAllFrames = !state.showAllFrames;
+        renderFrameGrid();
+        syncUI();
+        persist();
+        return;
+      }
+      if (event.target.closest("[data-jp-reset]")) {
+        const frameId = state.frameId;
+        const lensId = state.lensId;
+        state = resetState();
+        state.frameId = frameId;
+        state.lensId = lensId;
+        ensureSelection();
+        commit({ preview: true, frameGrid: true, lensGrid: true, comparisons: true });
+        showToast("Customization reset");
+        return;
+      }
+      if (event.target.closest("[data-jp-compare]")) {
         const current = selection();
-        if (current.frame && current.lens && state.comparisons.length < 3) { state.comparisons.push({ frame: current.frame, lens: current.lens, total: current.total, settings: { ...state, lensColorCode: current.color.color, lensColorName: current.color.name } }); showToast("Combination saved for comparison"); }
+        if (current.frame && current.lens && state.comparisons.length < 3) {
+          state.comparisons.push({
+            frameId: current.frame.id,
+            lensId: current.lens.id,
+            total: current.total,
+            settings: {
+              ...state,
+              comparisons: [],
+              lensColorCode: current.color.color,
+              lensOpacity: current.lens.tintOpacity,
+              lensColorName: current.color.name,
+              lensShapeName: current.shape.name,
+            },
+          });
+          renderComparisons();
+          syncUI();
+          persist();
+          showToast("Combination saved for comparison");
+        }
+        return;
       }
-      if (target.hasAttribute("data-jp-customizer-add")) {
+      const remove = event.target.closest("[data-jp-compare-remove]");
+      if (remove) {
+        state.comparisons.splice(Number(remove.dataset.jpCompareRemove), 1);
+        renderComparisons();
+        syncUI();
+        persist();
+        return;
+      }
+      if (event.target.closest("[data-jp-add]")) {
         const current = selection();
         if (!current.frame || !current.lens) return;
         const currency = current.frame.currency || current.lens.currency || "USD";
-        const customization = { frameId: current.frame.id, frameName: current.frame.name, frameImageUrl: current.frame.imageUrl || "", frameLensMaskUrl: current.frame.lensMaskUrl || "", frameStyle: current.frame.style || "Classic", frameMetadata: current.frame.metadata || null, frameFinish: current.finish.name, frameFinishId: current.finish.id, lensId: current.lens.id, lensName: current.lens.name, lensType: current.lensType.name, lensColor: current.color.name, lensColorCode: current.color.color, lensOpacity: current.lens.tintOpacity, lensStyle: current.lens.style, lensShape: current.shape.id, lensDesign: current.design.id, lensCut: current.cut.id, cornerStyle: current.corner.id, protections: current.protection.map((item) => item.name), prescription: current.lensType.id === "prescription" ? { left: state.prescriptionLeft, right: state.prescriptionRight } : null, engraving: state.engraving.trim(), engravingPosition: state.engravingPosition, afterWear: current.extras.map((item) => item.name), breakdown: current.lineItems };
-        const requirements = [`Lens: ${current.lensType.name}`, current.lensType.id === "prescription" ? `Prescription L ${state.prescriptionLeft || "—"} / R ${state.prescriptionRight || "—"}` : "", `Shape: ${current.shape.name}`, `Design: ${current.design.name}`, `Cut: ${current.cut.name}`, `Corners: ${current.corner.name}`, `Protection: ${current.protection.map((item) => item.name).join(", ")}`, state.engraving.trim() ? `Engraving: “${state.engraving.trim()}” on ${state.engravingPosition}` : ""].filter(Boolean).join(" · ");
-        const url = current.frame.productUrl || (productId ? `/product/${productId}` : "/shop");
+        const frameProductId = Number(current.frame.productId || productId || 0);
+        if (!frameProductId) {
+          showToast("This frame is not linked to a product yet.");
+          return;
+        }
+        const prescription =
+          current.lensType.id === "prescription"
+            ? { left: state.prescriptionLeft, right: state.prescriptionRight }
+            : null;
+        const customization = {
+          frameId: current.frame.id,
+          frameName: current.frame.name,
+          frameImageUrl: current.frame.imageUrl || "",
+          frameLensMaskUrl: current.frame.lensMaskUrl || "",
+          frameStyle: current.frame.style || "Classic",
+          frameType: current.frame.frameType || "Eyewear",
+          frameMaterial: current.frame.material || "",
+          frameColor: current.frame.color || "",
+          frameColorCode: current.frame.colorCode || "",
+          frameMetadata: current.frame.metadata || null,
+          frameFinishId: current.finish.id,
+          frameFinish: current.finish.name,
+          lensId: current.lens.id,
+          lensName: current.lens.name,
+          lensType: current.lensType.name,
+          lensTypeId: current.lensType.id,
+          lensColor: current.color.name,
+          lensColorId: current.color.id,
+          lensColorCode: current.color.color,
+          lensOpacity: current.lens.tintOpacity,
+          lensStyle: current.lens.style,
+          lensShape: current.shape.id,
+          lensShapeName: current.shape.name,
+          lensDesign: current.design.id,
+          lensDesignName: current.design.name,
+          lensCut: current.cut.id,
+          lensCutName: current.cut.name,
+          cornerStyle: current.corner.id,
+          cornerName: current.corner.name,
+          protectionIds: [...state.protectionIds],
+          protections: current.protection.map((item) => item.name),
+          prescription,
+          engraving: state.engraving.trim(),
+          engravingPosition: state.engravingPosition,
+          afterWearIds: [...state.afterWearIds],
+          afterWear: current.extras.map((item) => item.name),
+          breakdown: current.lineItems.map(({ label, amount, base }) => ({ label, amount, base })),
+          total: current.total,
+          currency,
+          view: {
+            rotation: state.viewRotation,
+            tilt: state.viewTilt,
+            zoom: state.viewZoom,
+          },
+        };
+        const requirements = [
+          `Frame: ${current.frame.name}`,
+          `Finish: ${current.finish.name}`,
+          `Lens: ${current.lens.name}`,
+          `Type: ${current.lensType.name}`,
+          prescription ? `Prescription L ${state.prescriptionLeft || "—"} / R ${state.prescriptionRight || "—"}` : "",
+          `Shape: ${current.shape.name}`,
+          `Design: ${current.design.name}`,
+          `Cut: ${current.cut.name}`,
+          `Corners: ${current.corner.name}`,
+          `Color: ${current.color.name}`,
+          `Protection: ${current.protection.map((item) => item.name).join(", ")}`,
+          state.engraving.trim()
+            ? `Engraving: “${state.engraving.trim()}” on ${state.engravingPosition}`
+            : "",
+          `After-wear: ${current.extras.map((item) => item.name).join(", ")}`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        const url = current.frame.productUrl || `/product/${frameProductId}`;
+        const signature = JSON.stringify(customization);
         const cart = readCart();
-        const existing = cart.find((item) => item.url === url && item.customizer?.frameId === current.frame.id && item.customizer?.lensId === current.lens.id && JSON.stringify(item.customizer) === JSON.stringify(customization));
-        if (existing) existing.quantity = Number(existing.quantity || 0) + 1; else cart.push({ name: `${current.frame.name} / ${current.color.name} ${current.shape.name}`, url, quantity: 1, image: current.frame.imageUrl || "", price: customizerMoney(current.total, currency), priceValue: current.total, requirements, customizer: customization });
-        writeCart(cart); updateCartBadge(); showToast(`${current.frame.name} added to your bag`);
+        const existing = cart.find((item) => item.customizer?.signature === signature);
+        if (existing) {
+          existing.quantity = Number(existing.quantity || 0) + 1;
+        } else {
+          cart.push({
+            name: `${current.frame.name} / ${current.color.name} ${current.shape.name}`,
+            url,
+            quantity: 1,
+            image: current.frame.imageUrl || "",
+            price: customizerMoney(current.total, currency),
+            priceValue: current.total,
+            requirements,
+            customizer: { ...customization, signature },
+          });
+        }
+        writeCart(cart);
+        updateCartBadge();
+        showToast(`${current.frame.name} added to your bag`);
+        return;
       }
-      if (customizerData) render(customizerData);
     });
+
     customizer.addEventListener("change", (event) => {
       const target = event.target;
-      if (target.matches("[data-jp-customizer-frame-type]")) state.frameType = target.value;
-      if (target.matches("[data-jp-customizer-frame-style]")) state.frameStyle = target.value;
-      if (target.matches("[data-jp-engraving-position]")) state.engravingPosition = target.value;
-      state.showAllFrames = false;
-      if (customizerData) render(customizerData);
+      if (target.matches("[data-jp-filter-type]")) state.frameType = target.value;
+      if (target.matches("[data-jp-filter-style]")) state.frameStyle = target.value;
+      if (target.matches("[data-jp-engraving-position]")) {
+        state.engravingPosition = target.value;
+        commit({ preview: true });
+        return;
+      }
+      if (target.matches("[data-jp-prescription]")) {
+        state[target.dataset.jpPrescription === "left" ? "prescriptionLeft" : "prescriptionRight"] =
+          target.value;
+        persist();
+        return;
+      }
+      if (target.matches("[data-jp-filter-type], [data-jp-filter-style]")) {
+        state.showAllFrames = false;
+        renderFrameGrid();
+        syncUI();
+        persist();
+      }
     });
+
     customizer.addEventListener("input", (event) => {
       const target = event.target;
-      if (target.matches("[data-jp-engraving]")) { state.engraving = target.value.slice(0, 16); updateLive(); }
-      if (target.matches("[data-jp-prescription]")) state[target.dataset.jpPrescription === "left" ? "prescriptionLeft" : "prescriptionRight"] = target.value;
+      if (target.matches("[data-jp-engraving]")) {
+        state.engraving = target.value.slice(0, 16);
+        updateEngraving();
+        syncUI();
+        persist();
+      }
+      if (target.matches("[data-jp-prescription]")) {
+        state[target.dataset.jpPrescription === "left" ? "prescriptionLeft" : "prescriptionRight"] =
+          target.value;
+        persist();
+      }
     });
-    fetch("/api/customizer", { credentials: "same-origin" }).then((response) => { if (!response.ok) throw new Error("Customizer unavailable"); return response.json(); }).then((data) => { customizerData = data; render(data); }).catch(() => { customizer.innerHTML = '<p class="jp-customizer__error">We could not load customization options. Refresh to try again.</p>'; });
+
+    fetch("/api/customizer", { credentials: "same-origin" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Customizer unavailable");
+        return response.json();
+      })
+      .then((payload) => {
+        customizerData = {
+          frames: Array.isArray(payload.frames) ? payload.frames : [],
+          lenses: Array.isArray(payload.lenses) ? payload.lenses : [],
+          compatibility:
+            payload.compatibility && typeof payload.compatibility === "object"
+              ? payload.compatibility
+              : {},
+        };
+        options = mergeOptions(payload.options);
+        ensureSelection();
+        if (!customizerData.frames.length || !customizerData.lenses.length) {
+          customizer.innerHTML =
+            '<p class="jp-customizer__error">Customization options are not available right now. Please try again shortly.</p>';
+          return;
+        }
+        renderShell();
+        persist();
+      })
+      .catch(() => {
+        customizer.innerHTML =
+          '<p class="jp-customizer__error">We could not load customization options. Refresh to try again.</p>';
+      });
   };
 
   const setupCustomizerNavigation = () => {
@@ -1642,20 +3076,47 @@
           .map((item) => {
             const match = String(item.url || "").match(/\/product\/(\d+)/);
             const customization = item.customizer && typeof item.customizer === "object" ? item.customizer : null;
-            return match
+            if (!match) return null;
+            const customizerPayload = customization
               ? {
-                  productId: Number(match[1]),
-                  quantity: Math.max(1, Number(item.quantity) || 1),
-                  ...(Number(item.variantId) > 0 ? { variantId: Number(item.variantId) } : {}),
-                  ...(customizerUuid(customization?.frameId) && customizerUuid(customization?.lensId)
-                    ? {
-                        customizerFrameId: customization.frameId,
-                        customizerLensId: customization.lensId,
-                      }
-                    : {}),
-                  ...(item.requirements ? { requirements: String(item.requirements).slice(0, 1000) } : {}),
+                  frameFinishId: customization.frameFinishId,
+                  frameFinish: customization.frameFinish,
+                  lensShape: customization.lensShape,
+                  lensShapeName: customization.lensShapeName,
+                  lensDesign: customization.lensDesign,
+                  lensDesignName: customization.lensDesignName,
+                  lensCut: customization.lensCut,
+                  lensCutName: customization.lensCutName,
+                  cornerStyle: customization.cornerStyle,
+                  cornerName: customization.cornerName,
+                  lensColorId: customization.lensColorId,
+                  lensColor: customization.lensColor,
+                  lensColorCode: customization.lensColorCode,
+                  lensOpacity: customization.lensOpacity,
+                  lensTypeId: customization.lensTypeId,
+                  lensType: customization.lensType,
+                  protectionIds: customization.protectionIds,
+                  afterWearIds: customization.afterWearIds,
+                  engraving: customization.engraving,
+                  engravingPosition: customization.engravingPosition,
+                  prescription: customization.prescription,
+                  view: customization.view,
+                  currency: customization.currency,
                 }
               : null;
+            return {
+              productId: Number(match[1]),
+              quantity: Math.max(1, Number(item.quantity) || 1),
+              ...(Number(item.variantId) > 0 ? { variantId: Number(item.variantId) } : {}),
+              ...(customizerUuid(customization?.frameId) && customizerUuid(customization?.lensId)
+                ? {
+                    customizerFrameId: customization.frameId,
+                    customizerLensId: customization.lensId,
+                  }
+                : {}),
+              ...(customizerPayload ? { customizer: customizerPayload } : {}),
+              ...(item.requirements ? { requirements: String(item.requirements).slice(0, 1000) } : {}),
+            };
           })
           .filter(Boolean);
         if (!items.length) {
