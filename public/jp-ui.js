@@ -1412,7 +1412,17 @@
     const innerLeft = cxLeft + width / 2;
     const innerRight = cxRight - width / 2;
     const middle = (innerLeft + innerRight) / 2;
-    const templeStart = cy - height * 0.22;
+    const templeStart = cy - height * 0.34;
+    const templeEndY = cy - height * 0.27;
+    const templeEndX = (side) => (side === "left" ? outerLeft + width * 0.5 : outerRight - width * 0.5);
+    const templeLiftX = (side) => {
+      const outer = side === "left" ? outerLeft : outerRight;
+      const inward = side === "left" ? 1 : -1;
+      return outer + inward * width * 0.22;
+    };
+    const templePeakY = cy - height * 0.7;
+    const templeThickness = Math.max(look.temple * 2.2, 12);
+    const templeTipThickness = templeThickness * 0.72;
     const bridgeY = cy - height * 0.4;
     const bridgeDip = look.bridgeStyle === 0 ? -8 : look.bridgeStyle === 1 ? 10 : 0;
     const engraving = String(settings.engraving || "").trim().slice(0, 16);
@@ -1423,36 +1433,73 @@
     const colorName = settings.lensColorName || lens?.color || "tinted";
     const aria = `${frame?.name || "JP frame"} with ${lens?.name || "selected lenses"}, ${shapeName} shape and ${colorName} lenses`;
 
-    const templePath = (side) => {
+    const templeGeometry = (side) => {
       const outer = side === "left" ? outerLeft : outerRight;
-      const direction = side === "left" ? -1 : 1;
-      const endX = 450 + direction * 376;
-      const tipX = 450 + direction * 400;
-      return `M ${outer.toFixed(1)} ${templeStart.toFixed(1)} C ${(outer + direction * 54).toFixed(1)} ${(templeStart - 24).toFixed(1)}, ${(outer + direction * 118).toFixed(1)} ${(cy - 64).toFixed(1)}, ${endX.toFixed(1)} ${(cy - 42).toFixed(1)} C ${tipX.toFixed(1)} ${(cy - 26).toFixed(1)}, ${tipX.toFixed(1)} ${(cy + 22).toFixed(1)}, ${(endX + direction * 22).toFixed(1)} ${(cy + 34).toFixed(1)}`;
+      const inward = side === "left" ? 1 : -1;
+      return { outer, inward, liftX: templeLiftX(side), endX: templeEndX(side) };
+    };
+
+    const templePoint = (side, progress) => {
+      const { outer, inward, liftX, endX } = templeGeometry(side);
+      const firstSegment = 0.42;
+      const segmentProgress = progress <= firstSegment ? progress / firstSegment : (progress - firstSegment) / (1 - firstSegment);
+      const start = { x: outer, y: templeStart };
+      const lift = { x: liftX, y: templePeakY };
+      const end = { x: endX, y: templeEndY };
+      const controls = progress <= firstSegment
+        ? [
+            start,
+            { x: outer + inward * 18, y: templeStart - height * 0.22 },
+            { x: liftX - inward * 16, y: templePeakY },
+            lift,
+          ]
+        : [
+            lift,
+            { x: liftX + inward * 22, y: templePeakY },
+            { x: endX - inward * 26, y: templeEndY - height * 0.18 },
+            end,
+          ];
+      const inverse = 1 - segmentProgress;
+      return {
+        x: inverse ** 3 * controls[0].x + 3 * inverse ** 2 * segmentProgress * controls[1].x + 3 * inverse * segmentProgress ** 2 * controls[2].x + segmentProgress ** 3 * controls[3].x,
+        y: inverse ** 3 * controls[0].y + 3 * inverse ** 2 * segmentProgress * controls[1].y + 3 * inverse * segmentProgress ** 2 * controls[2].y + segmentProgress ** 3 * controls[3].y,
+      };
+    };
+
+    const templePath = (side) => {
+      const { outer, inward, liftX, endX } = templeGeometry(side);
+      const topStart = templeStart - templeThickness / 2;
+      const bottomStart = templeStart + templeThickness / 2;
+      const topPeak = templePeakY - templeThickness / 2;
+      const bottomPeak = templePeakY + templeThickness / 2;
+      const topTip = templeEndY - templeTipThickness / 2;
+      const bottomTip = templeEndY + templeTipThickness / 2;
+      return `M ${outer.toFixed(1)} ${topStart.toFixed(1)} C ${(outer + inward * 18).toFixed(1)} ${(templeStart - height * 0.22 - templeThickness * 0.45).toFixed(1)}, ${(liftX - inward * 16).toFixed(1)} ${(topPeak - templeThickness * 0.12).toFixed(1)}, ${liftX.toFixed(1)} ${topPeak.toFixed(1)} C ${(liftX + inward * 22).toFixed(1)} ${topPeak.toFixed(1)}, ${(endX - inward * 26).toFixed(1)} ${(templeEndY - height * 0.18 - templeTipThickness * 0.2).toFixed(1)}, ${endX.toFixed(1)} ${topTip.toFixed(1)} L ${endX.toFixed(1)} ${bottomTip.toFixed(1)} C ${(endX - inward * 26).toFixed(1)} ${(templeEndY - height * 0.18 + templeTipThickness * 0.2).toFixed(1)}, ${(liftX + inward * 22).toFixed(1)} ${bottomPeak.toFixed(1)}, ${liftX.toFixed(1)} ${bottomPeak.toFixed(1)} C ${(liftX - inward * 16).toFixed(1)} ${(bottomPeak + templeThickness * 0.12).toFixed(1)}, ${(outer + inward * 18).toFixed(1)} ${(templeStart - height * 0.22 + templeThickness * 0.45).toFixed(1)}, ${outer.toFixed(1)} ${bottomStart.toFixed(1)} Z`;
     };
 
     const templeDetail = (side) => {
-      const outer = side === "left" ? outerLeft : outerRight;
-      const direction = side === "left" ? -1 : 1;
-      const endX = 450 + direction * 376;
-      const endY = cy - 42;
       if (look.templeStyle === 1) {
         return Array.from({ length: 7 }, (_, index) => {
           const t = (index + 1) / 8;
-          const x = outer + (endX - outer) * t;
-          const y = templeStart + (endY - templeStart) * t - Math.sin(t * Math.PI) * 8;
+          const { x, y } = templePoint(side, t);
           return `<line x1="${x.toFixed(1)}" y1="${(y - 5).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y + 5).toFixed(1)}" stroke="${look.dark}" stroke-width="1.6" opacity=".55"/>`;
         }).join("");
       }
       if (look.templeStyle === 2) {
         return Array.from({ length: 5 }, (_, index) => {
           const t = (index + 1) / 6;
-          const x = outer + (endX - outer) * t;
-          const y = templeStart + (endY - templeStart) * t - Math.sin(t * Math.PI) * 8;
+          const { x, y } = templePoint(side, t);
           return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="none" stroke="${look.light}" stroke-width="1.2" opacity=".7"/>`;
         }).join("");
       }
       return "";
+    };
+
+    const templeHinge = (side) => {
+      const outer = side === "left" ? outerLeft : outerRight;
+      const hingeLength = Math.max(look.rim * 1.6, 15);
+      const x = side === "left" ? outer - 3 : outer - hingeLength + 3;
+      return `<rect x="${x.toFixed(1)}" y="${(templeStart - templeThickness * 0.62).toFixed(1)}" width="${hingeLength.toFixed(1)}" height="${(templeThickness * 1.24).toFixed(1)}" rx="${(templeThickness * 0.22).toFixed(1)}" fill="${look.dark}" opacity=".94"/>`;
     };
 
     const lensMarkup = (side) => {
@@ -1496,7 +1543,7 @@
         <clipPath id="${clipId}"><path d="${d}"/></clipPath>
         <path d="${d}" fill="url(#${uid}-lens)" opacity="${fillOpacity.toFixed(3)}"/>
         <g clip-path="url(#${clipId})">
-          <path d="${d}" fill="url(#${uid}-sheen)" opacity=".62"/>
+          <path class="jp-studio-lens-sheen" d="${d}" fill="url(#${uid}-sheen)" opacity=".62"/>
           ${protectionMarkup}
           ${designMarkup}
           ${cutMarkup}
@@ -1564,14 +1611,14 @@
       </defs>
       <ellipse cx="450" cy="512" rx="300" ry="24" fill="#2b2114" opacity=".16" filter="url(#${uid}-blur)"/>
       <g transform="translate(450 296) scale(${look.scale.toFixed(3)}) translate(-450 -296)" filter="url(#${uid}-shadow)">
-        <path d="${templePath("left")}" fill="none" stroke="${look.dark}" stroke-width="${(look.temple + 2).toFixed(1)}" stroke-linecap="round" opacity=".9"/>
-        <path d="${templePath("left")}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${look.temple.toFixed(1)}" stroke-linecap="round"/>
-        <path d="${templePath("right")}" fill="none" stroke="${look.dark}" stroke-width="${(look.temple + 2).toFixed(1)}" stroke-linecap="round" opacity=".9"/>
-        <path d="${templePath("right")}" fill="none" stroke="url(#${uid}-frame)" stroke-width="${look.temple.toFixed(1)}" stroke-linecap="round"/>
-        ${templeDetail("left")}
-        ${templeDetail("right")}
-        <circle cx="${outerLeft.toFixed(1)}" cy="${templeStart.toFixed(1)}" r="${(look.rim * 0.62).toFixed(1)}" fill="${look.dark}"/>
-        <circle cx="${outerRight.toFixed(1)}" cy="${templeStart.toFixed(1)}" r="${(look.rim * 0.62).toFixed(1)}" fill="${look.dark}"/>
+        <g class="jp-studio-arms" aria-hidden="true">
+          <path d="${templePath("left")}" fill="url(#${uid}-frame)" stroke="${look.dark}" stroke-width="1.8" stroke-linejoin="round" opacity=".96"/>
+          <path d="${templePath("right")}" fill="url(#${uid}-frame)" stroke="${look.dark}" stroke-width="1.8" stroke-linejoin="round" opacity=".96"/>
+          ${templeDetail("left")}
+          ${templeDetail("right")}
+          ${templeHinge("left")}
+          ${templeHinge("right")}
+        </g>
         ${lensMarkup("left")}
         ${lensMarkup("right")}
         <path d="${bridgePath}" fill="none" stroke="${look.dark}" stroke-width="${(look.rim * 0.9 + 2).toFixed(1)}" stroke-linecap="round" opacity=".7"/>
@@ -1596,7 +1643,7 @@
     const viewZoom = Number(settings.viewZoom || 1);
     return `<div class="jp-customizer__stage jp-studio-stage${compact ? " is-compact" : ""}" data-jp-preview-stage style="--lens-color:${lensColor};--lens-opacity:${lensOpacity.toFixed(3)}">
       <div class="jp-studio-stage__wash" aria-hidden="true"></div>
-      <div class="jp-studio-scene" data-jp-preview-scene style="--preview-rotate:${viewRotation}deg;--preview-tilt:${viewTilt}deg;--preview-scale:${viewZoom}">${customizerStudioSvg(frame, lens, settings)}</div>
+      <div class="jp-studio-scene" data-jp-preview-scene style="--preview-rotate:${viewRotation}deg;--preview-tilt:${viewTilt}deg;--preview-scale:${viewZoom}"><div class="jp-studio-object">${customizerStudioSvg(frame, lens, settings)}</div></div>
       ${
         compact
           ? ""
