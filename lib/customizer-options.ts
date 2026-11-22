@@ -99,6 +99,7 @@ export const CUSTOMIZER_OPTIONS: CustomizerOptions = {
     option("step", "Stepped", 55, true, { meta: "Architectural layers" }),
     option("faceted", "Faceted", 70, true, { meta: "Light-catching planes" }),
     option("contour", "Contour", 85, true, { meta: "Sculpted outer edge" }),
+    option("diamond", "Diamond Cut", 120, true, { meta: "Precision-faceted edge" }),
   ],
   corners: [
     option("soft", "Soft", 0),

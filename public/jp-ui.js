@@ -1336,9 +1336,30 @@
     }
     return {
       d: customizerStudioSmoothPath(points),
+      points,
       width: preset.width,
       height: preset.height,
     };
+  };
+
+  const customizerStudioDiamondFacetMarkup = (points, palette = {}) => {
+    if (!Array.isArray(points) || points.length < 8) return "";
+    const highlight = palette.highlight || "rgba(255,255,255,.2)";
+    const shadow = palette.shadow || "rgba(0,0,0,.16)";
+    const edge = palette.edge || "rgba(255,255,255,.38)";
+    const step = Math.max(3, Math.round(points.length / 24));
+    const span = Math.min(step, 3);
+    const point = (value) => `${value[0].toFixed(2)} ${value[1].toFixed(2)}`;
+    const scaled = (value, factor) => [value[0] * factor, value[1] * factor];
+    return Array.from({ length: Math.ceil(points.length / step) }, (_, index) => {
+      const start = points[(index * step) % points.length];
+      const end = points[(index * step + span) % points.length];
+      const midpoint = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
+      const innerStart = scaled(start, 0.84);
+      const innerEnd = scaled(end, 0.84);
+      const innerPoint = scaled(midpoint, 0.7);
+      return `<path class="jp-studio-diamond-facet jp-studio-diamond-facet--highlight" d="M ${point(start)} L ${point(end)} L ${point(innerPoint)} Z" fill="${highlight}"/><path class="jp-studio-diamond-facet jp-studio-diamond-facet--shadow" d="M ${point(innerPoint)} L ${point(innerEnd)} L ${point(innerStart)} Z" fill="${shadow}"/><path class="jp-studio-diamond-facet__edge" d="M ${point(start)} L ${point(innerPoint)} L ${point(end)}" fill="none" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>`;
+    }).join("");
   };
 
   const customizerStudioFrameLook = (frame, finishId) => {
@@ -1529,6 +1550,13 @@
           inset(0.88, 0.45, 3) +
           `<path d="${d}" transform="scale(.84)" fill="none" stroke="rgba(0,0,0,.2)" stroke-width="4"/>`;
       }
+      if (cut === "diamond") {
+        cutMarkup = customizerStudioDiamondFacetMarkup(geometry.points, {
+          highlight: "rgba(255,255,255,.28)",
+          shadow: "rgba(0,0,0,.2)",
+          edge: "rgba(255,255,255,.5)",
+        });
+      }
       let protectionMarkup = "";
       if (hasProtection("polarized")) {
         protectionMarkup += `<rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" fill="url(#${uid}-polarized)" opacity=".3"/>`;
@@ -1703,6 +1731,7 @@
         { id: "step", name: "Stepped", meta: "Architectural layers", price: 55, visual: true },
         { id: "faceted", name: "Faceted", meta: "Light-catching planes", price: 70, visual: true },
         { id: "contour", name: "Contour", meta: "Sculpted outer edge", price: 85, visual: true },
+        { id: "diamond", name: "Diamond Cut", meta: "Precision-faceted edge", price: 120, visual: true },
       ],
       corners: [
         { id: "soft", name: "Soft", price: 0, visual: true },
@@ -2016,6 +2045,13 @@
           `<path d="M 0 ${-geometry.height / 2} L ${geometry.width / 2} ${geometry.height / 6} L 0 ${geometry.height / 2} L ${-geometry.width / 2} ${geometry.height / 6} Z" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/>`;
       }
       if (cutId === "contour") detail = inset(0.86, 0.5, 6);
+      if (cutId === "diamond") {
+        detail = customizerStudioDiamondFacetMarkup(geometry.points, {
+          highlight: "rgba(28,26,23,.16)",
+          shadow: "rgba(28,26,23,.08)",
+          edge: "rgba(28,26,23,.42)",
+        });
+      }
       return `<svg viewBox="-132 -98 264 196" aria-hidden="true"><path d="${geometry.d}" fill="rgba(28,26,23,.07)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>${detail}</svg>`;
     };
     const designGlyph = (designId) => {

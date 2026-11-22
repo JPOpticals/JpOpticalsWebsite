@@ -7854,3 +7854,13 @@ button.jp-account-button {
     white-space: normal;
   }
 }
+
+/* Keep every customization step label readable before the strip scrolls. */
+.jp-studio-steps {
+  scroll-padding-inline: 8px;
+}
+
+.jp-studio-step {
+  gap: 4px;
+  padding-inline: 6px;
+}
