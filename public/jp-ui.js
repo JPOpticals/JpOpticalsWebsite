@@ -258,7 +258,7 @@
   `;
 
   const menuArticles = Array.from(
-    document.querySelectorAll("header nav a"),
+    document.querySelectorAll("header nav > a, header nav .jp-nav-item > a"),
   ).flatMap((link) => {
     const href = link.getAttribute("href") || "/";
     const label = categoryText(link.textContent);
@@ -1744,15 +1744,9 @@
         { id: "crown", name: "Crown", price: 0, visual: true },
       ],
       colors: [
-        { id: "clear", name: "Clear", color: "#eef2f0", price: 0, visual: true },
-        { id: "blue", name: "Blue", color: "#5d8fa7", price: 20, visual: true },
-        { id: "green", name: "Green", color: "#667e6a", price: 20, visual: true },
-        { id: "gold", name: "Gold", color: "#b79a58", price: 25, visual: true },
-        { id: "white", name: "White", color: "#f5f3ed", price: 0, visual: true },
-        { id: "grey", name: "Grey", color: "#6d7476", price: 15, visual: true },
-        { id: "smoke", name: "Smoke", color: "#3f4a50", price: 25, visual: true },
-        { id: "rose", name: "Rose", color: "#a97578", price: 25, visual: true },
-        { id: "amber", name: "Amber", color: "#b97e4d", price: 25, visual: true },
+        { id: "golden", name: "Golden", color: "#b79a58", price: 25, visual: true },
+        { id: "silver", name: "Silver", color: "#b7c0c5", price: 15, visual: true },
+        { id: "black", name: "Black", color: "#252322", price: 25, visual: true },
       ],
       lensTypes: [
         { id: "non-prescription", name: "Non-prescription", meta: "Fashion tint or clear", price: 0, visual: true },
@@ -1797,7 +1791,7 @@
       lensDesign: "regular",
       lensCut: "classic",
       cornerStyle: "soft",
-      lensColor: "clear",
+      lensColor: "silver",
       lensColorTouched: false,
       lensType: "non-prescription",
       protectionIds: ["uv"],
@@ -1908,14 +1902,20 @@
     };
     const mapLensColor = (lens) => {
       const map = {
-        clear: "clear",
-        "ice blue": "blue",
-        smoke: "smoke",
-        amber: "amber",
-        olive: "green",
-        graphite: "grey",
+        amber: "golden",
+        gold: "golden",
+        golden: "golden",
+        clear: "silver",
+        "ice blue": "silver",
+        silver: "silver",
+        grey: "silver",
+        smoke: "black",
+        black: "black",
+        graphite: "black",
+        olive: "black",
+        green: "black",
       };
-      return map[normalize(lens?.color)] || "clear";
+      return map[normalize(lens?.color)] || "silver";
     };
 
     const ensureSelection = () => {
@@ -1945,7 +1945,17 @@
       state.lensDesign = ensureOption(options.designs, state.lensDesign, "regular");
       state.lensCut = ensureOption(options.cuts, state.lensCut, "classic");
       state.cornerStyle = ensureOption(options.corners, state.cornerStyle, "soft");
-      state.lensColor = ensureOption(options.colors, state.lensColor, "clear");
+      const lensColorAliases = {
+        clear: "silver",
+        gold: "golden",
+        amber: "golden",
+        grey: "silver",
+        silver: "silver",
+        smoke: "black",
+        black: "black",
+      };
+      const migratedLensColor = lensColorAliases[normalize(state.lensColor)] || state.lensColor;
+      state.lensColor = ensureOption(options.colors, migratedLensColor, "silver");
       state.lensType = ensureOption(options.lensTypes, state.lensType, "non-prescription");
       state.protectionIds = (Array.isArray(state.protectionIds) ? state.protectionIds : [])
         .map(String)
@@ -2072,6 +2082,10 @@
     const frameGridMarkup = () => {
       const frames = visibleFrames();
       const shown = state.showAllFrames ? frames : frames.slice(0, 8);
+      const selectedIndex = frames.findIndex((item) => String(item.id) === String(state.frameId));
+      if (!state.showAllFrames && selectedIndex >= 8 && shown.length) {
+        shown[shown.length - 1] = frames[selectedIndex];
+      }
       if (!shown.length) {
         return '<p class="jp-studio-empty">No frames match these filters. Try another style.</p>';
       }
@@ -2335,9 +2349,9 @@
               </section>
             </div>
             <div class="jp-studio-actions">
-              <button type="button" class="jp-studio-reset" data-jp-reset>Reset customization</button>
-              <button type="button" class="jp-studio-compare" data-jp-compare${state.comparisons.length >= 3 ? " disabled" : ""}>${state.comparisons.length >= 3 ? "Comparison saved" : "Save to compare"}</button>
-              <button type="button" class="jp-studio-add" data-jp-add>Add pair to bag <span data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</span></button>
+              <button type="button" class="jp-studio-reset" data-jp-reset aria-label="Reset customization">Reset</button>
+              <button type="button" class="jp-studio-compare" data-jp-compare aria-label="Save customization to compare"${state.comparisons.length >= 3 ? " disabled" : ""}>${state.comparisons.length >= 3 ? "Saved" : "Compare"}</button>
+              <button type="button" class="jp-studio-add" data-jp-add><span class="jp-studio-add__label">Add to bag</span> <span data-jp-live-total>${escapeHtml(customizerMoney(current.total, currency))}</span></button>
             </div>
             <div data-jp-comparisons></div>
             <aside class="jp-studio-order">
@@ -2504,7 +2518,7 @@
       const compare = customizer.querySelector("[data-jp-compare]");
       if (compare) {
         compare.disabled = state.comparisons.length >= 3;
-        compare.textContent = state.comparisons.length >= 3 ? "Comparison saved" : "Save to compare";
+        compare.textContent = state.comparisons.length >= 3 ? "Saved" : "Compare";
       }
       const frameCount = customizer.querySelector("[data-jp-frame-count]");
       if (frameCount) frameCount.textContent = `${visibleFrames().length} frames`;
@@ -2569,13 +2583,10 @@
       activeStep = step;
       syncPanels();
       if (!scroll) return;
+      if (window.matchMedia("(max-width: 1180px)").matches) return;
       const controls = customizer.querySelector(".jp-studio-controls");
       if (!controls) return;
-      if (window.matchMedia("(max-width: 1180px)").matches) {
-        controls.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        controls.scrollTo({ top: 0, behavior: "smooth" });
-      }
+      controls.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const bindPreview = () => {
@@ -4365,6 +4376,7 @@
 
   const setupAnnouncements = async () => {
     const content = await loadContent();
+    if (!content) return;
     const announcements = Array.isArray(content?.announcements)
       ? content.announcements.filter((announcement) => String(announcement?.message || "").trim())
       : [];
@@ -4381,10 +4393,19 @@
     };
     const render = (mount, items, modifier) => {
       if (!items.length) {
+        if (modifier === "jp-announcements--homepage" && mount) {
+          mount.className = `jp-announcements ${modifier} jp-announcements--pending`;
+          mount.replaceChildren();
+          mount.setAttribute("aria-hidden", "true");
+          mount.setAttribute("aria-busy", "true");
+          return;
+        }
         mount?.remove();
         return;
       }
       mount.className = `jp-announcements ${modifier}`;
+      mount.removeAttribute("aria-hidden");
+      mount.removeAttribute("aria-busy");
       mount.replaceChildren(
         ...items.map((announcement) => {
           const row = document.createElement("div");

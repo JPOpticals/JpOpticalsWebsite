@@ -112,15 +112,9 @@ export const CUSTOMIZER_OPTIONS: CustomizerOptions = {
     option("crown", "Crown", 0),
   ],
   colors: [
-    option("clear", "Clear", 0, true, { color: "#eef2f0" }),
-    option("blue", "Blue", 20, true, { color: "#5d8fa7" }),
-    option("green", "Green", 20, true, { color: "#667e6a" }),
-    option("gold", "Gold", 25, true, { color: "#b79a58" }),
-    option("white", "White", 0, true, { color: "#f5f3ed" }),
-    option("grey", "Grey", 15, true, { color: "#6d7476" }),
-    option("smoke", "Smoke", 25, true, { color: "#3f4a50" }),
-    option("rose", "Rose", 25, true, { color: "#a97578" }),
-    option("amber", "Amber", 25, true, { color: "#b97e4d" }),
+    option("golden", "Golden", 25, true, { color: "#b79a58" }),
+    option("silver", "Silver", 15, true, { color: "#b7c0c5" }),
+    option("black", "Black", 25, true, { color: "#252322" }),
   ],
   lensTypes: [
     option("non-prescription", "Non-prescription", 0, true, { meta: "Fashion tint or clear" }),

@@ -1737,6 +1737,18 @@ body {
   margin: 0;
 }
 
+.jp-announcements--pending {
+  min-height: 43px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+@media (max-width: 640px) {
+  .jp-announcements--pending {
+    min-height: 69px;
+  }
+}
+
 .jp-announcements--footer {
   border-top: 1px solid #e5e2df;
 }
@@ -7863,4 +7875,677 @@ button.jp-account-button {
 .jp-studio-step {
   gap: 4px;
   padding-inline: 6px;
+}
+
+/* Mobile customization workspace: keep the preview, step rail, and active panel in one visual track. */
+@media (max-width: 760px) {
+  body.jp-customizer-page {
+    background: #fff;
+  }
+
+  .jp-customizer-page .jp-standalone-header {
+    background: #fff;
+  }
+
+  .jp-customizer-page__main {
+    padding-inline: clamp(12px, 4vw, 18px);
+    padding-top: 8px;
+    padding-bottom: 104px;
+  }
+
+  .jp-standalone-header__inner,
+  .jp-customizer-page__footer {
+    padding-inline: clamp(12px, 4vw, 18px);
+  }
+
+  .jp-customizer-page__back-row {
+    min-height: 32px;
+    margin-bottom: 10px;
+  }
+
+  .jp-customizer-page__back {
+    gap: 6px;
+    color: #4d4943;
+    font-size: 13px;
+  }
+
+  .jp-customizer-page__back svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .jp-customizer-page__note {
+    display: none;
+  }
+
+  .jp-studio {
+    --jp-studio-mobile-header-height: 69px;
+    --jp-studio-mobile-visual-height: 432px;
+    padding-bottom: 20px;
+  }
+
+  .jp-customizer--pro.jp-studio {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .jp-studio-head {
+    display: none;
+  }
+
+  .jp-studio-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .jp-studio-visual {
+    position: sticky;
+    z-index: 30;
+    top: var(--jp-studio-mobile-header-height);
+    order: 0;
+    gap: 8px;
+    align-self: stretch;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid var(--studio-line);
+    background: #fff;
+    box-shadow: 0 10px 22px rgb(33 28 20 / 7%);
+  }
+
+  .jp-studio-visual__top {
+    min-height: 34px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .jp-studio-visual__label {
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .jp-studio-visual__label span,
+  .jp-studio-visual__meta {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .jp-studio-visual__label strong {
+    display: block;
+    max-width: 52vw;
+    overflow: hidden;
+    font-size: 18px;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .jp-studio-visual__meta {
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .jp-studio .jp-customizer__stage.jp-studio-stage {
+    height: clamp(190px, 54vw, 214px);
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  .jp-studio-tools {
+    top: 8px;
+    right: 8px;
+    gap: 3px;
+    padding: 4px;
+  }
+
+  .jp-studio-tools button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .jp-studio-visual__under {
+    gap: 6px;
+  }
+
+  .jp-studio-view {
+    min-height: 34px;
+    gap: 6px;
+  }
+
+  .jp-studio-view button {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  .jp-studio-view span {
+    min-width: 42px;
+    font-size: 12px;
+  }
+
+  .jp-studio-view__reset {
+    padding-inline: 9px !important;
+    font-size: 11px !important;
+  }
+
+  .jp-studio-chips {
+    flex-wrap: nowrap;
+    gap: 6px;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .jp-studio-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .jp-studio-chip {
+    flex: 0 0 auto;
+    gap: 5px;
+    min-height: 32px;
+    padding: 6px 9px;
+    border-radius: 10px;
+  }
+
+  .jp-studio-chip span {
+    font-size: 10px;
+    letter-spacing: .1em;
+  }
+
+  .jp-studio-chip strong {
+    max-width: 116px;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .jp-studio-visual__foot {
+    min-height: 40px;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  .jp-studio-visual__detail {
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .jp-studio-visual__detail > span {
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .jp-studio-visual__detail small {
+    font-size: 11px;
+  }
+
+  .jp-studio-visual__foot > strong {
+    font-size: 20px;
+  }
+
+  .jp-studio-controls {
+    position: relative;
+    z-index: 1;
+    order: 1;
+    width: 100%;
+    padding-bottom: 0;
+  }
+
+  .jp-studio-steps-wrap {
+    position: sticky;
+    z-index: 25;
+    top: calc(var(--jp-studio-mobile-header-height) + var(--jp-studio-mobile-visual-height));
+    padding: 6px 0 8px;
+    background: #fff;
+  }
+
+  .jp-studio-steps {
+    gap: 2px;
+    padding: 4px;
+    border-color: #ddd7cd;
+    border-radius: 14px;
+    background: #f7f4ef;
+  }
+
+  .jp-studio-step {
+    flex: 0 0 auto;
+    min-height: 42px;
+    gap: 5px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .jp-studio-step__icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .jp-studio-step__icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .jp-studio-step__label {
+    font-size: 12px;
+    letter-spacing: .05em;
+  }
+
+  .jp-studio-panels {
+    padding-top: 8px;
+  }
+
+  .jp-studio-panel__head {
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+  }
+
+  .jp-studio-panel__head > div {
+    gap: 8px;
+  }
+
+  .jp-studio-panel__head h2 {
+    font-size: 26px;
+  }
+
+  .jp-studio-panel__head small {
+    font-size: 11px;
+    text-align: right;
+  }
+
+  .jp-studio-panel__lede {
+    margin: 10px 0 14px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .jp-studio-filters {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .jp-studio-filters label,
+  .jp-studio-field {
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .jp-studio-filters select,
+  .jp-studio-field input,
+  .jp-studio-field select {
+    min-height: 44px;
+    padding: 9px 10px;
+    font-size: 15px;
+  }
+
+  .jp-studio-frame-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .jp-studio-frame {
+    min-height: 72px;
+    padding: 8px 10px;
+  }
+
+  .jp-studio-frame__media {
+    width: 68px;
+    height: 54px;
+  }
+
+  .jp-studio-frame__name {
+    font-size: 15px;
+  }
+
+  .jp-studio-frame__meta,
+  .jp-studio-frame__price {
+    font-size: 12px;
+  }
+
+  .jp-studio-more {
+    min-height: 44px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+
+  .jp-studio-subhead {
+    margin-top: 20px;
+    margin-bottom: 10px;
+  }
+
+  .jp-studio-subhead span,
+  .jp-studio-subhead small {
+    font-size: 12px;
+  }
+
+  .jp-studio-swatches,
+  .jp-studio-swatches--lens,
+  .jp-studio-choice-grid,
+  .jp-studio-choice-grid--two,
+  .jp-studio-choice-grid--three,
+  .jp-studio-shape-grid,
+  .jp-studio-corner-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .jp-studio-swatches--lens {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .jp-studio-swatch {
+    min-height: 64px;
+    padding: 9px;
+  }
+
+  .jp-studio-swatches--lens .jp-studio-swatch {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+  }
+
+  .jp-studio-swatches--lens .jp-studio-swatch__dot {
+    width: 27px;
+    height: 27px;
+  }
+
+  .jp-studio-choice {
+    min-height: 92px;
+    padding: 9px;
+  }
+
+  .jp-studio-choice__glyph {
+    width: 38px;
+    height: 34px;
+  }
+
+  .jp-studio-choice__copy strong,
+  .jp-studio-swatch__copy strong {
+    font-size: 14px;
+  }
+
+  .jp-studio-choice__copy small,
+  .jp-studio-choice__price,
+  .jp-studio-swatch__copy small {
+    font-size: 12px;
+  }
+
+  .jp-studio-lens__copy strong,
+  .jp-studio-toggle__copy strong {
+    font-size: 15px;
+  }
+
+  .jp-studio-lens__copy small,
+  .jp-studio-lens__copy em,
+  .jp-studio-toggle__copy small,
+  .jp-studio-lens__price,
+  .jp-studio-toggle__price {
+    font-size: 12px;
+  }
+
+  .jp-studio-lens-grid,
+  .jp-studio-toggle-list {
+    gap: 8px;
+  }
+
+  .jp-studio-lens,
+  .jp-studio-toggle {
+    min-height: 66px;
+    padding: 9px 10px;
+  }
+
+  .jp-studio-actions {
+    position: relative;
+    z-index: 1;
+    grid-template-columns: minmax(0, .8fr) minmax(0, .8fr) minmax(0, 1.6fr);
+    gap: 8px;
+    margin-inline: 0;
+    margin-top: 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--studio-line);
+    background: #fff;
+  }
+
+  .jp-studio-reset,
+  .jp-studio-compare {
+    min-height: 48px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: .06em;
+  }
+
+  .jp-studio-add {
+    grid-column: auto;
+    min-height: 48px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    letter-spacing: .08em;
+  }
+
+  .jp-studio-add span {
+    font-size: 16px;
+  }
+
+  .jp-studio-order {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .jp-studio {
+    --jp-studio-mobile-visual-height: 414px;
+  }
+
+  .jp-studio-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .jp-studio-add {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 400px) and (max-width: 760px) {
+  .jp-studio {
+    --jp-studio-mobile-visual-height: 434px;
+  }
+}
+
+/* Seal the mobile sticky stack so page content cannot show through its seams. */
+@media (max-width: 760px) {
+  .jp-studio-layout {
+    gap: 0;
+  }
+
+  .jp-studio-visual {
+    box-sizing: border-box;
+    min-height: var(--jp-studio-mobile-visual-height);
+    isolation: isolate;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .jp-studio-visual__top,
+  .jp-studio-visual__under,
+  .jp-studio-visual__foot {
+    position: relative;
+    z-index: 1;
+    background: #fff;
+  }
+
+  .jp-studio-visual__under {
+    padding-block: 2px;
+  }
+
+  .jp-studio-steps-wrap {
+    box-sizing: border-box;
+    isolation: isolate;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .jp-studio-steps,
+  .jp-studio-chips {
+    isolation: isolate;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: #fff;
+  }
+
+  .jp-studio-controls,
+  .jp-studio-panels {
+    background: #fff;
+  }
+
+  .jp-studio-tools {
+    top: 6px;
+    right: 6px;
+    gap: 2px;
+    padding: 3px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgb(33 28 20 / 10%);
+  }
+
+  .jp-studio-tools button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .jp-studio-tools svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .jp-studio-view {
+    min-height: 30px;
+    gap: 4px;
+  }
+
+  .jp-studio-view button {
+    min-width: 28px;
+    height: 28px;
+    padding-inline: 6px;
+    font-size: 12px;
+  }
+
+  .jp-studio-view__reset {
+    padding-inline: 7px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* Keep action copy and prices readable inside every mobile grid track. */
+.jp-customizer--pro .jp-studio-add__label {
+  font-family: var(--font-nav), var(--font-work-sans), sans-serif;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+}
+
+@media (max-width: 760px) {
+  .jp-customizer--pro .jp-studio-actions {
+    display: grid;
+    grid-template-columns: minmax(0, .9fr) minmax(0, .9fr) minmax(0, 1.8fr);
+    gap: 8px;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .jp-customizer--pro .jp-studio-actions > button {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    line-height: 1.2;
+  }
+
+  .jp-customizer--pro .jp-studio-reset,
+  .jp-customizer--pro .jp-studio-compare {
+    min-height: 50px;
+    padding: 8px;
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+
+  .jp-customizer--pro .jp-studio-add {
+    display: flex;
+    min-height: 50px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    letter-spacing: .04em;
+    text-align: left;
+  }
+
+  .jp-customizer--pro .jp-studio-add__label {
+    min-width: 0;
+    overflow: hidden;
+    flex: 1 1 auto;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .jp-customizer--pro .jp-studio-add > span[data-jp-live-total] {
+    min-width: 0;
+    flex: 0 0 auto;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+
+  .jp-customizer--pro .jp-studio-visual__label span,
+  .jp-customizer--pro .jp-studio-visual__meta,
+  .jp-customizer--pro .jp-studio-stage__hint,
+  .jp-customizer--pro .jp-studio-chip span,
+  .jp-customizer--pro .jp-studio-panel__head span,
+  .jp-customizer--pro .jp-studio-panel__head small,
+  .jp-customizer--pro .jp-studio-filters label,
+  .jp-customizer--pro .jp-studio-field,
+  .jp-customizer--pro .jp-studio-subhead span,
+  .jp-customizer--pro .jp-studio-subhead small,
+  .jp-customizer--pro .jp-studio-rx label,
+  .jp-customizer--pro .jp-studio-order__head span,
+  .jp-customizer--pro .jp-studio-no-visual {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .jp-customizer--pro .jp-studio-step__label,
+  .jp-customizer--pro .jp-studio-view span,
+  .jp-customizer--pro .jp-studio-chip strong,
+  .jp-customizer--pro .jp-studio-frame__meta,
+  .jp-customizer--pro .jp-studio-frame__price,
+  .jp-customizer--pro .jp-studio-swatch__copy small,
+  .jp-customizer--pro .jp-studio-lens__copy small,
+  .jp-customizer--pro .jp-studio-choice__copy small,
+  .jp-customizer--pro .jp-studio-field span,
+  .jp-customizer--pro .jp-studio-compare-card > small,
+  .jp-customizer--pro .jp-studio-toggle__price,
+  .jp-customizer--pro .jp-studio-lens__price,
+  .jp-customizer--pro .jp-studio-choice__price,
+  .jp-customizer--pro .jp-studio-visual__detail small {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+}
+
+@media (max-width: 360px) {
+  .jp-customizer--pro .jp-studio-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .jp-customizer--pro .jp-studio-add {
+    grid-column: 1 / -1;
+  }
 }
